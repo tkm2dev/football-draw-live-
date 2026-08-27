@@ -1,0 +1,2 @@
+<script setup lang="ts">import type { Team } from '../lib/types';defineProps<{name:string;teams:Team[]}>()</script>
+<template><section class="group-card"><div class="group-title">สาย <b>{{name}}</b></div><div v-for="(team,i) in teams" :key="team.id" class="team-row"><span class="num">{{i+1}}</span><span>{{team.name}}</span></div><div v-for="i in Math.max(0,3-teams.length)" :key="'x'+i" class="team-row ghost"><span class="num">{{teams.length+i}}</span><span>รอจับสลาก...</span></div></section></template>

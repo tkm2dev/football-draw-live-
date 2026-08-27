@@ -1,0 +1,15 @@
+{
+  "name": "web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {"dev":"vite","build":"vue-tsc -b && vite build"},
+  "dependencies": {
+    "@vitejs/plugin-vue":"latest",
+    "pinia":"latest",
+    "socket.io-client":"latest",
+    "vue":"latest",
+    "vue-router":"latest"
+  },
+  "devDependencies": {"typescript":"latest","vite":"latest","vue-tsc":"latest"}
+}

@@ -2,6 +2,7 @@
 import {computed,onMounted,ref} from 'vue'
 import TopBar from '../components/TopBar.vue'
 import GroupCard from '../components/GroupCard.vue'
+import TournamentCrest from '../components/TournamentCrest.vue'
 import {useTournamentStore} from '../stores/tournament'
 
 const store=useTournamentStore()
@@ -22,10 +23,13 @@ function saveAdminKey(){store.setAdminKey(adminKey.value);message.value=store.ad
     <main class="content admin-layout">
       <section class="admin-main">
         <header class="broadcast-toolbar">
-          <div>
-            <div class="eyebrow">OFFICIAL DRAW CONTROL • SESSION {{store.events[0]?.id || 'NEW'}}</div>
-            <h1>ศูนย์ควบคุมการจับสลาก</h1>
-            <p>ฟุตบอลเฉลิมพระเกียรติ ครั้งที่ 13/2569</p>
+          <div class="admin-heading">
+            <TournamentCrest/>
+            <div>
+              <div class="eyebrow">OFFICIAL DRAW CONTROL • SESSION {{store.events[0]?.id || 'NEW'}}</div>
+              <h1>ศูนย์ควบคุมการจับสลาก</h1>
+              <p>ฟุตบอลเฉลิมพระเกียรติ ครั้งที่ 13/2569</p>
+            </div>
           </div>
           <label class="division-select"><span>รุ่นการแข่งขัน</span><select v-model="store.divisionKey" :disabled="busy" @change="store.setDivision(store.divisionKey)"><option value="PUBLIC">รุ่นประชาชน</option><option value="SENIOR40">รุ่นอาวุโส 40+</option></select></label>
         </header>

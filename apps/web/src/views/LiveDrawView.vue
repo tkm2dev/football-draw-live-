@@ -2,6 +2,7 @@
 import {computed,onBeforeUnmount,onMounted,ref} from 'vue'
 import {useRoute} from 'vue-router'
 import GroupCard from '../components/GroupCard.vue'
+import TournamentCrest from '../components/TournamentCrest.vue'
 import {useTournamentStore} from '../stores/tournament'
 import type {DivisionKey} from '../lib/types'
 
@@ -27,8 +28,8 @@ onBeforeUnmount(()=>window.clearInterval(timer))
   <div class="live-broadcast" :class="{locked:store.locked}">
     <div class="stadium-scene"><div class="floodlight left"></div><div class="floodlight right"></div><div class="pitch-lines"></div></div>
     <header class="broadcast-head">
-      <div class="event-mark"><div class="trophy-mark">♛</div><div><small>ROYAL HONOR FOOTBALL</small><strong>PLAPAK 2026</strong></div></div>
-      <div class="event-title"><span>พิธีจับสลากแบ่งสาย</span><h1>ฟุตบอลเฉลิมพระเกียรติ</h1><p>ครั้งที่ 13/2569 • {{store.division.name}} <b>{{store.division.subtitle}}</b></p></div>
+      <div class="event-mark"><TournamentCrest/><div><small>ROYAL HONOR FOOTBALL</small><strong>PLAPAK 2026</strong></div></div>
+      <div class="event-title"><span>✦ พิธีจับสลากแบ่งสาย ✦</span><h1>ฟุตบอลเฉลิมพระเกียรติ</h1><p>ครั้งที่ 13/2569 • {{store.division.name}} <b>{{store.division.subtitle}}</b></p></div>
       <div class="on-air"><span><i></i>{{store.connected?'ON AIR':'LINKING'}}</span><time>{{now.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})}}</time><button title="เต็มจอ" @click="toggleFullscreen">{{fullscreen?'⊙':'⛶'}}</button></div>
     </header>
 

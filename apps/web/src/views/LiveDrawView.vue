@@ -1,13 +1,52 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import {computed,onBeforeUnmount,onMounted,ref} from 'vue'
+import {useRoute} from 'vue-router'
 import GroupCard from '../components/GroupCard.vue'
-import { useTournamentStore } from '../stores/tournament'
-const s=useTournamentStore();onMounted(async()=>{s.connect();await s.loadState()})
+import {useTournamentStore} from '../stores/tournament'
+import type {DivisionKey} from '../lib/types'
+
+const store=useTournamentStore()
+const route=useRoute()
+const now=ref(new Date())
+const fullscreen=ref(false)
+let timer:number|undefined
+const featuredGroup=computed(()=>store.currentReveal?.group)
+const statusText=computed(()=>store.locked?'OFFICIAL RESULT':store.status==='COMPLETED'?'DRAW COMPLETED':store.status==='LIVE'?'LIVE DRAW IN PROGRESS':'STANDBY')
+async function toggleFullscreen(){if(!document.fullscreenElement)await document.documentElement.requestFullscreen();else await document.exitFullscreen();fullscreen.value=Boolean(document.fullscreenElement)}
+onMounted(async()=>{
+  const key=route.query.division
+  if(key==='PUBLIC'||key==='SENIOR40')store.divisionKey=key as DivisionKey
+  store.connect();await store.setDivision(store.divisionKey)
+  timer=window.setInterval(()=>now.value=new Date(),1000)
+  document.addEventListener('fullscreenchange',()=>fullscreen.value=Boolean(document.fullscreenElement))
+})
+onBeforeUnmount(()=>window.clearInterval(timer))
 </script>
-<template><div class="live"><div class="lights"></div><div class="stadium-glow"></div>
-<section class="live-head"><div class="cup">🏆</div><div><div class="champion-kicker">ROYAL HONOR FOOTBALL 2026</div><div class="live-title">ฟุตบอลเฉลิมพระเกียรติ</div><div class="live-sub">ครั้งที่ 13/2569</div><div class="division">{{s.division.name}} <span>({{s.division.subtitle}})</span> • รับ 12 ทีม</div></div></section>
-<section class="reveal" :class="{idle:!s.currentReveal}"><span>{{s.currentReveal?'⚽ ผลการจับสลากล่าสุด':'🎱 LIVE DRAW'}}</span><strong>{{s.currentReveal?s.currentReveal.team.name:'กำลังรอการจับสลาก'}}</strong><b>{{s.currentReveal?'สาย '+s.currentReveal.group:s.drawnIds.length+' / 12 ทีม'}}</b></section>
-<div class="live-progress"><i :style="{width:s.progress+'%'}"></i></div>
-<div class="group-grid live-grid"><GroupCard name="A" :teams="s.groups.A"/><GroupCard name="B" :teams="s.groups.B"/><GroupCard name="C" :teams="s.groups.C"/><GroupCard name="D" :teams="s.groups.D"/></div>
-<footer class="live-footer"><span>LIVE • PLAPAK DISTRICT</span><strong>{{s.locked?'ผลการจับสลากอย่างเป็นทางการ':'จับสลากแบบ Real-time'}}</strong><span>{{s.drawnIds.length}}/12</span></footer>
-</div></template>
+
+<template>
+  <div class="live-broadcast" :class="{locked:store.locked}">
+    <div class="stadium-scene"><div class="floodlight left"></div><div class="floodlight right"></div><div class="pitch-lines"></div></div>
+    <header class="broadcast-head">
+      <div class="event-mark"><div class="trophy-mark">♛</div><div><small>ROYAL HONOR FOOTBALL</small><strong>PLAPAK 2026</strong></div></div>
+      <div class="event-title"><span>พิธีจับสลากแบ่งสาย</span><h1>ฟุตบอลเฉลิมพระเกียรติ</h1><p>ครั้งที่ 13/2569 • {{store.division.name}} <b>{{store.division.subtitle}}</b></p></div>
+      <div class="on-air"><span><i></i>{{store.connected?'ON AIR':'LINKING'}}</span><time>{{now.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})}}</time><button title="เต็มจอ" @click="toggleFullscreen">{{fullscreen?'⊙':'⛶'}}</button></div>
+    </header>
+
+    <main class="broadcast-content">
+      <section class="reveal-stage">
+        <div class="reveal-kicker"><span>{{statusText}}</span><b>{{store.drawnIds.length}} / {{store.totalTeams}}</b></div>
+        <Transition name="broadcast-reveal" mode="out-in">
+          <div :key="store.currentReveal?.team.id||store.status" class="reveal-result">
+            <template v-if="store.currentReveal"><div class="ball-seal">⚽</div><div class="revealed-team"><small>TEAM REVEALED</small><strong>{{store.currentReveal.team.name}}</strong></div><div class="group-reveal"><small>GROUP</small><b>{{store.currentReveal.group}}</b></div></template>
+            <template v-else><div class="ball-seal standby">13</div><div class="revealed-team"><small>OFFICIAL LIVE DRAW</small><strong>กำลังรอการจับสลาก</strong></div><div class="group-reveal idle"><small>GROUP</small><b>–</b></div></template>
+          </div>
+        </Transition>
+        <div class="draw-meter"><div class="meter-line"><i :style="{width:store.progress+'%'}"></i></div><div class="meter-nodes"><span v-for="index in store.totalTeams" :key="index" :class="{done:index<=store.drawnIds.length,current:index===store.drawnIds.length}">{{index}}</span></div></div>
+      </section>
+
+      <section class="live-groups"><GroupCard name="A" :teams="store.groups.A" :featured="featuredGroup==='A'"/><GroupCard name="B" :teams="store.groups.B" :featured="featuredGroup==='B'"/><GroupCard name="C" :teams="store.groups.C" :featured="featuredGroup==='C'"/><GroupCard name="D" :teams="store.groups.D" :featured="featuredGroup==='D'"/></section>
+    </main>
+
+    <footer class="broadcast-footer"><div><i></i> LIVE • OFFICIAL DRAW FEED</div><strong>{{store.locked?'ผลการจับสลากอย่างเป็นทางการ • LOCKED':'ระบบจับสลากภายใต้เงื่อนไขการแข่งขัน'}}</strong><span>4 GROUPS • 12 TEAMS</span></footer>
+  </div>
+</template>

@@ -1,27 +1,86 @@
-import express from 'express'
+import 'dotenv/config'
+import express,{type NextFunction,type Request,type Response} from 'express'
 import cors from 'cors'
-import { createServer } from 'node:http'
-import { Server } from 'socket.io'
-import { z } from 'zod'
-import { drawAll,drawNext,emptyState,setLock,states } from './services/drawEngine.js'
-import { generateGroupMatches,listMatches,updateMatch,standings,generateKnockout,advanceKnockout,summary } from './services/tournamentEngine.js'
-import type { DivisionKey } from './data.js'
-const app=express();const server=createServer(app);const io=new Server(server,{cors:{origin:process.env.WEB_ORIGIN||'*'}})
-app.use(cors());app.use(express.json({limit:'2mb'}))
+import {createServer} from 'node:http'
+import {fileURLToPath} from 'node:url'
+import path from 'node:path'
+import {timingSafeEqual} from 'node:crypto'
+import {Server} from 'socket.io'
+import {z} from 'zod'
+import {prisma,disconnectDb} from './db.js'
+import {drawAll,drawNext,getDrawState,resetDraw,setDrawLock,type AuditContext} from './services/drawService.js'
+import {advanceKnockout,generateGroupMatches,generateKnockout,listMatches,standings,summary,updateMatch} from './services/tournamentEngine.js'
+import type {DivisionKey} from './services/drawEngine.js'
+
+const app=express()
+app.set('trust proxy',1)
+const server=createServer(app)
+const allowedOrigins=(process.env.WEB_ORIGIN||'http://localhost:5173').split(',').map(value=>value.trim()).filter(Boolean)
+const corsOptions:cors.CorsOptions={origin:(origin,callback)=>callback(null,!origin||allowedOrigins.includes('*')||allowedOrigins.includes(origin))}
+const io=new Server(server,{cors:corsOptions})
+app.use(cors(corsOptions))
+app.use(express.json({limit:'2mb'}))
+
 const Division=z.enum(['PUBLIC','SENIOR40'])
-const emit=(k:DivisionKey)=>{io.emit('draw:state',states[k]);io.emit('tournament:update',summary(k))}
-app.get('/api/health',(_req,res)=>res.json({ok:true,name:'Football Draw Live API',version:'1.0.0'}))
-app.get('/api/draw/:division',(req,res)=>{const k=Division.parse(req.params.division);res.json(states[k])})
-app.post('/api/draw/reset',(req,res)=>{const k=Division.parse(req.body.divisionKey);states[k]=emptyState(k);emit(k);res.json(states[k])})
-app.post('/api/draw/next',(req,res)=>{try{const k=Division.parse(req.body.divisionKey);const state=drawNext(k);emit(k);res.json(state)}catch(e:any){res.status(400).json({message:e.message})}})
-app.post('/api/draw/all',(req,res)=>{try{const k=Division.parse(req.body.divisionKey);const state=drawAll(k);emit(k);res.json(state)}catch(e:any){res.status(400).json({message:e.message})}})
-app.post('/api/draw/lock',(req,res)=>{const k=Division.parse(req.body.divisionKey);const state=setLock(k,Boolean(req.body.locked));emit(k);res.json(state)})
-app.get('/api/tournament/:division',(req,res)=>{const k=Division.parse(req.params.division);res.json(summary(k))})
-app.post('/api/matches/generate',(req,res)=>{try{const k=Division.parse(req.body.divisionKey);const out=generateGroupMatches(k);emit(k);res.json(out)}catch(e:any){res.status(400).json({message:e.message})}})
-app.get('/api/matches/:division',(req,res)=>{const k=Division.parse(req.params.division);res.json(listMatches(k))})
-app.patch('/api/matches/:division/:id',(req,res)=>{try{const k=Division.parse(req.params.division);const m=updateMatch(k,req.params.id,req.body);emit(k);res.json(m)}catch(e:any){res.status(400).json({message:e.message})}})
-app.get('/api/standings/:division',(req,res)=>{const k=Division.parse(req.params.division);res.json(standings(k))})
-app.post('/api/knockout/generate',(req,res)=>{try{const k=Division.parse(req.body.divisionKey);const out=generateKnockout(k);emit(k);res.json(out)}catch(e:any){res.status(400).json({message:e.message})}})
-app.post('/api/knockout/advance',(req,res)=>{try{const k=Division.parse(req.body.divisionKey);const out=advanceKnockout(k);emit(k);res.json(out)}catch(e:any){res.status(400).json({message:e.message})}})
-io.on('connection',socket=>{socket.emit('draw:state',states.SENIOR40);socket.on('watch:division',(k:DivisionKey)=>socket.emit('tournament:update',summary(k)))})
-const port=Number(process.env.PORT||4000);server.listen(port,()=>console.log(`API on :${port}`))
+const DivisionBody=z.object({divisionKey:Division})
+const MatchPatch=z.object({homeScore:z.number().int().min(0).nullable().optional(),awayScore:z.number().int().min(0).nullable().optional(),status:z.enum(['SCHEDULED','LIVE','FINISHED']).optional(),kickoffAt:z.iso.datetime().nullable().optional(),field:z.string().max(120).optional()})
+const route=(handler:(req:Request,res:Response)=>Promise<void>)=>(req:Request,res:Response,next:NextFunction)=>handler(req,res).catch(next)
+const context=(req:Request):AuditContext=>({actor:String(req.header('x-admin-user')||'draw-admin').slice(0,120),ip:req.ip})
+const adminKey=process.env.ADMIN_API_KEY||''
+const adminKeyReady=adminKey.length>=32
+const requireAdmin=(req:Request,res:Response,next:NextFunction)=>{
+  if(!adminKeyReady){if(process.env.NODE_ENV==='production'){res.status(503).json({message:'ADMIN_API_KEY บน production ต้องมีอย่างน้อย 32 ตัวอักษร'});return}next();return}
+  const supplied=req.header('x-admin-key')||''
+  const valid=supplied.length===adminKey.length&&timingSafeEqual(Buffer.from(supplied),Buffer.from(adminKey))
+  if(!valid){res.status(401).json({message:'Admin key ไม่ถูกต้อง'});return}
+  next()
+}
+
+async function emit(key:DivisionKey,state?:Awaited<ReturnType<typeof getDrawState>>){
+  const nextState=state??await getDrawState(key)
+  io.to(`division:${key}`).emit('draw:state',nextState)
+  io.to(`division:${key}`).emit('tournament:update',await summary(key))
+}
+
+app.get('/api/health',route(async(_req,res)=>{
+  try{await prisma.$queryRaw`SELECT 1`;res.json({ok:true,name:'Football Draw Live API',version:'2.0.0',database:'ready',adminSecurity:adminKeyReady?'ready':process.env.NODE_ENV==='production'?'missing-or-weak':'development',time:new Date().toISOString()})}
+  catch{res.status(503).json({ok:false,name:'Football Draw Live API',version:'2.0.0',database:'unavailable'})}
+}))
+app.get('/api/draw/:division',route(async(req,res)=>{res.json(await getDrawState(Division.parse(req.params.division)))}))
+app.post('/api/draw/reset',requireAdmin,route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;const state=await resetDraw(key,context(req));await emit(key,state);res.json(state)}))
+app.post('/api/draw/next',requireAdmin,route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;const state=await drawNext(key,context(req));await emit(key,state);res.json(state)}))
+app.post('/api/draw/all',requireAdmin,route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;const state=await drawAll(key,context(req));await emit(key,state);res.json(state)}))
+app.post('/api/draw/lock',requireAdmin,route(async(req,res)=>{const body=DivisionBody.extend({locked:z.boolean()}).parse(req.body);const state=await setDrawLock(body.divisionKey,body.locked,context(req));await emit(body.divisionKey,state);res.json(state)}))
+app.get('/api/tournament/:division',route(async(req,res)=>{res.json(await summary(Division.parse(req.params.division)))}))
+app.post('/api/matches/generate',requireAdmin,route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;const out=await generateGroupMatches(key,context(req));await emit(key);res.json(out)}))
+app.get('/api/matches/:division',route(async(req,res)=>{res.json(await listMatches(Division.parse(req.params.division)))}))
+app.patch('/api/matches/:division/:id',requireAdmin,route(async(req,res)=>{const key=Division.parse(req.params.division);const match=await updateMatch(key,z.string().parse(req.params.id),MatchPatch.parse(req.body),context(req));await emit(key);res.json(match)}))
+app.get('/api/standings/:division',route(async(req,res)=>{res.json(await standings(Division.parse(req.params.division)))}))
+app.post('/api/knockout/generate',requireAdmin,route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;const out=await generateKnockout(key,context(req));await emit(key);res.json(out)}))
+app.post('/api/knockout/advance',requireAdmin,route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;const out=await advanceKnockout(key,context(req));await emit(key);res.json(out)}))
+
+io.on('connection',socket=>{
+  const watch=async(value:unknown)=>{
+    const key=Division.parse(value)
+    for(const room of socket.rooms)if(room.startsWith('division:'))socket.leave(room)
+    socket.join(`division:${key}`)
+    socket.emit('draw:state',await getDrawState(key))
+    socket.emit('tournament:update',await summary(key))
+  }
+  socket.on('watch:division',(value:unknown)=>watch(value).catch(error=>socket.emit('server:error',{message:error instanceof Error?error.message:'เกิดข้อผิดพลาด'})))
+  watch('SENIOR40').catch(()=>undefined)
+})
+
+const webDist=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../web/dist')
+app.use(express.static(webDist))
+app.get(/^(?!\/api|\/socket\.io).*/,(_req,res)=>res.sendFile(path.join(webDist,'index.html')))
+app.use((error:unknown,_req:Request,res:Response,_next:NextFunction)=>{
+  if(error instanceof z.ZodError){res.status(400).json({message:'ข้อมูลที่ส่งมาไม่ถูกต้อง',issues:error.issues});return}
+  const message=error instanceof Error?error.message:'เกิดข้อผิดพลาดภายในระบบ'
+  console.error(error)
+  res.status(message.includes('ไม่พบ')?404:message.includes('ถูกล็อก')||message.includes('กรุณา')||message.includes('ต้อง')?409:500).json({message})
+})
+
+const port=Number(process.env.PORT||4000)
+server.listen(port,()=>console.log(`Football Draw Live API listening on :${port}`))
+for(const signal of ['SIGINT','SIGTERM'] as const)process.on(signal,()=>server.close(()=>disconnectDb().finally(()=>process.exit(0))))

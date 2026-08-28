@@ -1,11 +1,46 @@
-import {defineStore} from 'pinia';import {io} from 'socket.io-client';import {divisions} from '../lib/data';import type{DivisionKey,DrawState,GroupMap,GroupCode,Match,Standing,Team}from'../lib/types'
-const emptyGroups=():GroupMap=>({A:[],B:[],C:[],D:[]});const api=(import.meta as any).env?.VITE_API_URL||'http://localhost:4000'
-async function json(r:Response){const x=await r.json();if(!r.ok)throw new Error(x.message||'เกิดข้อผิดพลาด');return x}
-export const useTournamentStore=defineStore('tournament',{state:()=>({divisionKey:'SENIOR40' as DivisionKey,groups:emptyGroups(),drawnIds:[]as string[],currentReveal:null as null|{team:Team;group:GroupCode},matches:[]as Match[],standings:{A:[],B:[],C:[],D:[]}as Record<GroupCode,Standing[]>,socket:null as any,status:'READY'as DrawState['status'],locked:false,events:[]as DrawState['events'],lastError:''}),getters:{division:s=>divisions.find(d=>d.key===s.divisionKey)!,remaining:s=>divisions.find(d=>d.key===s.divisionKey)!.teams.filter(t=>!s.drawnIds.includes(t.id)),progress:s=>Math.round(s.drawnIds.length/12*100),groupMatches:s=>s.matches.filter(m=>m.stage==='GROUP'),knockoutMatches:s=>s.matches.filter(m=>m.stage!=='GROUP')},actions:{
- applyState(x:DrawState){this.groups=x.groups;this.drawnIds=x.drawnIds;this.currentReveal=x.currentReveal;this.status=x.status;this.locked=x.locked;this.events=x.events||[]},
- async setDivision(k:DivisionKey){this.divisionKey=k;await Promise.all([this.loadState(),this.loadTournament()])},connect(){if(this.socket)return;this.socket=io(api);this.socket.on('draw:state',(x:DrawState)=>{if(x.divisionKey===this.divisionKey)this.applyState(x)});this.socket.on('tournament:update',(x:any)=>{if(x.divisionKey===this.divisionKey){this.matches=x.matches||[];this.standings=x.standings||this.standings}})},
- async loadState(){this.applyState(await json(await fetch(`${api}/api/draw/${this.divisionKey}`)))},async loadTournament(){const x=await json(await fetch(`${api}/api/tournament/${this.divisionKey}`));this.matches=x.matches||[];this.standings=x.standings||this.standings},
- async reset(){this.applyState(await json(await fetch(`${api}/api/draw/reset`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({divisionKey:this.divisionKey})})));this.matches=[];this.standings={A:[],B:[],C:[],D:[]}},
- async drawNext(){this.applyState(await json(await fetch(`${api}/api/draw/next`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({divisionKey:this.divisionKey})})))},async drawAll(){this.applyState(await json(await fetch(`${api}/api/draw/all`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({divisionKey:this.divisionKey})})))},async toggleLock(){this.applyState(await json(await fetch(`${api}/api/draw/lock`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({divisionKey:this.divisionKey,locked:!this.locked})})))},
- async generateMatches(){this.matches=await json(await fetch(`${api}/api/matches/generate`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({divisionKey:this.divisionKey})}));await this.loadTournament()},async saveScore(m:Match){await json(await fetch(`${api}/api/matches/${this.divisionKey}/${m.id}`,{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({homeScore:m.homeScore,awayScore:m.awayScore,status:'FINISHED',kickoffAt:m.kickoffAt,field:m.field})}));await this.loadTournament()},async generateKnockout(){await json(await fetch(`${api}/api/knockout/generate`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({divisionKey:this.divisionKey})}));await this.loadTournament()},async advanceKnockout(){await json(await fetch(`${api}/api/knockout/advance`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({divisionKey:this.divisionKey})}));await this.loadTournament()}
-}})
+import {defineStore} from 'pinia'
+import {io} from 'socket.io-client'
+import {divisions} from '../lib/data'
+import type {DivisionKey,DrawState,GroupMap,GroupCode,Match,Standing,Team} from '../lib/types'
+
+const emptyGroups=():GroupMap=>({A:[],B:[],C:[],D:[]})
+const configuredApi=(import.meta as any).env?.VITE_API_URL as string|undefined
+const api=configuredApi||((import.meta as any).env?.DEV?'http://localhost:4000':window.location.origin)
+async function json(response:Response){const data=await response.json();if(!response.ok)throw new Error(data.message||'เกิดข้อผิดพลาด');return data}
+const adminHeaders=(key:string)=>({'content-type':'application/json','x-admin-user':'draw-control',...(key?{'x-admin-key':key}:{})})
+
+export const useTournamentStore=defineStore('tournament',{
+  state:()=>({divisionKey:'SENIOR40' as DivisionKey,groups:emptyGroups(),drawnIds:[] as string[],totalTeams:12,currentReveal:null as null|{team:Team;group:GroupCode},matches:[] as Match[],standings:{A:[],B:[],C:[],D:[]} as Record<GroupCode,Standing[]>,socket:null as any,status:'READY' as DrawState['status'],locked:false,events:[] as DrawState['events'],lastError:'',connected:false,adminKey:sessionStorage.getItem('football-draw-admin-key')||''}),
+  getters:{
+    division:state=>divisions.find(division=>division.key===state.divisionKey)!,
+    remaining:state=>divisions.find(division=>division.key===state.divisionKey)!.teams.filter(team=>!state.drawnIds.includes(team.id)),
+    progress:state=>Math.round(state.drawnIds.length/Math.max(state.totalTeams,1)*100),
+    groupMatches:state=>state.matches.filter(match=>match.stage==='GROUP'),
+    knockoutMatches:state=>state.matches.filter(match=>match.stage!=='GROUP')
+  },
+  actions:{
+    applyState(state:DrawState){this.groups=state.groups;this.drawnIds=state.drawnIds;this.totalTeams=state.totalTeams||12;this.currentReveal=state.currentReveal;this.status=state.status;this.locked=state.locked;this.events=state.events||[]},
+    setAdminKey(key:string){this.adminKey=key.trim();if(this.adminKey)sessionStorage.setItem('football-draw-admin-key',this.adminKey);else sessionStorage.removeItem('football-draw-admin-key')},
+    async setDivision(key:DivisionKey){this.divisionKey=key;this.socket?.emit('watch:division',key);await Promise.all([this.loadState(),this.loadTournament()])},
+    connect(){
+      if(this.socket){this.socket.emit('watch:division',this.divisionKey);return}
+      this.socket=io(api)
+      this.socket.on('connect',()=>{this.connected=true;this.socket.emit('watch:division',this.divisionKey)})
+      this.socket.on('disconnect',()=>{this.connected=false})
+      this.socket.on('draw:state',(state:DrawState)=>{if(state.divisionKey===this.divisionKey)this.applyState(state)})
+      this.socket.on('tournament:update',(state:any)=>{if(state.divisionKey===this.divisionKey){this.matches=state.matches||[];this.standings=state.standings||this.standings}})
+      this.socket.on('server:error',(error:{message:string})=>{this.lastError=error.message})
+    },
+    async loadState(){this.applyState(await json(await fetch(`${api}/api/draw/${this.divisionKey}`)))},
+    async loadTournament(){const state=await json(await fetch(`${api}/api/tournament/${this.divisionKey}`));this.matches=state.matches||[];this.standings=state.standings||this.standings},
+    async post(url:string,body:unknown){return json(await fetch(`${api}${url}`,{method:'POST',headers:adminHeaders(this.adminKey),body:JSON.stringify(body)}))},
+    async reset(){this.applyState(await this.post('/api/draw/reset',{divisionKey:this.divisionKey}));this.matches=[];this.standings={A:[],B:[],C:[],D:[]}},
+    async drawNext(){this.applyState(await this.post('/api/draw/next',{divisionKey:this.divisionKey}))},
+    async drawAll(){this.applyState(await this.post('/api/draw/all',{divisionKey:this.divisionKey}))},
+    async toggleLock(){this.applyState(await this.post('/api/draw/lock',{divisionKey:this.divisionKey,locked:!this.locked}))},
+    async generateMatches(){this.matches=await this.post('/api/matches/generate',{divisionKey:this.divisionKey});await this.loadTournament()},
+    async saveScore(match:Match){await json(await fetch(`${api}/api/matches/${this.divisionKey}/${match.id}`,{method:'PATCH',headers:adminHeaders(this.adminKey),body:JSON.stringify({homeScore:match.homeScore,awayScore:match.awayScore,status:'FINISHED',kickoffAt:match.kickoffAt||null,field:match.field})}));await this.loadTournament()},
+    async generateKnockout(){await this.post('/api/knockout/generate',{divisionKey:this.divisionKey});await this.loadTournament()},
+    async advanceKnockout(){await this.post('/api/knockout/advance',{divisionKey:this.divisionKey});await this.loadTournament()}
+  }
+})

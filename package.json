@@ -7,11 +7,15 @@
     "dev:web":"npm --workspace apps/web run dev",
     "dev:api":"npm --workspace apps/api run dev",
     "build":"npm --workspace apps/web run build && npm --workspace apps/api run build",
+    "test":"npm --workspace apps/api run test",
+    "test:integration":"npm --workspace apps/api run test:integration",
+    "check":"npm run test && npm run build",
+    "smoke:realtime":"node scripts/smoke-realtime.mjs",
     "prisma:generate":"prisma generate",
-    "prisma:migrate":"prisma migrate deploy",
-    "prisma:seed":"tsx prisma/seed.ts"
+    "prisma:migrate":"dotenv -e apps/api/.env -- prisma migrate deploy",
+    "prisma:seed":"dotenv -e apps/api/.env -- tsx prisma/seed.ts"
   },
-  "devDependencies":{"prisma":"latest","tsx":"latest"},
-  "dependencies":{"@prisma/client":"latest"},
+  "devDependencies":{"dotenv-cli":"11.0.0","prisma":"6.12.0","tsx":"4.20.5"},
+  "dependencies":{"@prisma/client":"6.12.0"},
   "prisma":{"seed":"tsx prisma/seed.ts"}
 }

@@ -1,16 +1,186 @@
-generator client { provider = "prisma-client-js" }
-datasource db { provider = "mysql" url = env("DATABASE_URL") }
-enum DivisionType { PUBLIC SENIOR40 }
-enum GroupCode { A B C D }
-enum MatchStatus { SCHEDULED LIVE FINISHED }
-enum MatchStage { GROUP QF SF FINAL }
-enum DrawStatus { READY LIVE COMPLETED LOCKED }
-model Tournament { id Int @id @default(autoincrement()) name String edition String year Int venue String? createdAt DateTime @default(now()) updatedAt DateTime @updatedAt divisions Division[] }
-model Division { id Int @id @default(autoincrement()) tournamentId Int type DivisionType name String subtitle String? tournament Tournament @relation(fields:[tournamentId],references:[id],onDelete:Cascade) teams Team[] groups Group[] matches Match[] drawSessions DrawSession[] @@unique([tournamentId,type]) }
-model Team { id Int @id @default(autoincrement()) divisionId Int name String shortName String? logoUrl String? isSeed Boolean @default(false) sortOrder Int @default(0) division Division @relation(fields:[divisionId],references:[id],onDelete:Cascade) groupEntries GroupTeam[] homeMatches Match[] @relation("home") awayMatches Match[] @relation("away") drawEvents DrawEvent[] @@unique([divisionId,name]) }
-model Group { id Int @id @default(autoincrement()) divisionId Int code GroupCode division Division @relation(fields:[divisionId],references:[id],onDelete:Cascade) teams GroupTeam[] @@unique([divisionId,code]) }
-model GroupTeam { id Int @id @default(autoincrement()) groupId Int teamId Int drawOrder Int group Group @relation(fields:[groupId],references:[id],onDelete:Cascade) team Team @relation(fields:[teamId],references:[id],onDelete:Cascade) @@unique([groupId,teamId]) @@unique([teamId]) }
-model DrawRule { id Int @id @default(autoincrement()) divisionType DivisionType ruleType String payload Json active Boolean @default(true) createdAt DateTime @default(now()) }
-model DrawSession { id Int @id @default(autoincrement()) divisionId Int status DrawStatus @default(READY) lockedAt DateTime? startedAt DateTime? completedAt DateTime? snapshot Json? division Division @relation(fields:[divisionId],references:[id],onDelete:Cascade) events DrawEvent[] }
-model DrawEvent { id Int @id @default(autoincrement()) drawSessionId Int teamId Int? groupCode GroupCode? eventType String message String createdAt DateTime @default(now()) drawSession DrawSession @relation(fields:[drawSessionId],references:[id],onDelete:Cascade) team Team? @relation(fields:[teamId],references:[id],onDelete:SetNull) }
-model Match { id Int @id @default(autoincrement()) divisionId Int stage MatchStage @default(GROUP) groupCode GroupCode? round Int @default(1) homeTeamId Int awayTeamId Int homeScore Int? awayScore Int? kickoffAt DateTime? field String? status MatchStatus @default(SCHEDULED) createdAt DateTime @default(now()) updatedAt DateTime @updatedAt division Division @relation(fields:[divisionId],references:[id],onDelete:Cascade) home Team @relation("home",fields:[homeTeamId],references:[id]) away Team @relation("away",fields:[awayTeamId],references:[id]) }
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum DivisionType {
+  PUBLIC
+  SENIOR40
+}
+
+enum GroupCode {
+  A
+  B
+  C
+  D
+}
+
+enum MatchStatus {
+  SCHEDULED
+  LIVE
+  FINISHED
+}
+
+enum MatchStage {
+  GROUP
+  QF
+  SF
+  FINAL
+}
+
+enum DrawStatus {
+  READY
+  LIVE
+  COMPLETED
+  LOCKED
+}
+
+model Tournament {
+  id        Int        @id @default(autoincrement())
+  name      String
+  edition   String
+  year      Int
+  venue     String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  divisions Division[]
+
+  @@unique([edition, year])
+}
+
+model Division {
+  id           Int           @id @default(autoincrement())
+  tournamentId Int
+  type         DivisionType
+  name         String
+  subtitle     String?
+  tournament   Tournament    @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  teams        Team[]
+  groups       Group[]
+  matches      Match[]
+  drawSessions DrawSession[]
+  auditLogs    AuditLog[]
+
+  @@unique([tournamentId, type])
+}
+
+model Team {
+  id           Int         @id @default(autoincrement())
+  divisionId   Int
+  code         String
+  name         String
+  shortName    String?
+  logoUrl      String?
+  isSeed       Boolean     @default(false)
+  sortOrder    Int         @default(0)
+  division     Division    @relation(fields: [divisionId], references: [id], onDelete: Cascade)
+  groupEntries GroupTeam[]
+  homeMatches  Match[]     @relation("home")
+  awayMatches  Match[]     @relation("away")
+  drawEvents   DrawEvent[]
+
+  @@unique([divisionId, code])
+  @@unique([divisionId, name])
+}
+
+model Group {
+  id         Int         @id @default(autoincrement())
+  divisionId Int
+  code       GroupCode
+  division   Division    @relation(fields: [divisionId], references: [id], onDelete: Cascade)
+  teams      GroupTeam[]
+
+  @@unique([divisionId, code])
+}
+
+model GroupTeam {
+  id        Int   @id @default(autoincrement())
+  groupId   Int
+  teamId    Int   @unique
+  drawOrder Int
+  group     Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  team      Team  @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, teamId])
+}
+
+model DrawRule {
+  id           Int          @id @default(autoincrement())
+  divisionType DivisionType
+  ruleType     String
+  payload      Json
+  active       Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+
+  @@index([divisionType, active])
+}
+
+model DrawSession {
+  id          Int         @id @default(autoincrement())
+  divisionId  Int
+  status      DrawStatus  @default(READY)
+  lockedAt    DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+  snapshot    Json?
+  division    Division    @relation(fields: [divisionId], references: [id], onDelete: Cascade)
+  events      DrawEvent[]
+
+  @@index([divisionId, id])
+}
+
+model DrawEvent {
+  id            Int         @id @default(autoincrement())
+  drawSessionId Int
+  teamId        Int?
+  groupCode     GroupCode?
+  eventType     String
+  message       String
+  actor         String?
+  metadata      Json?
+  createdAt     DateTime    @default(now())
+  drawSession   DrawSession @relation(fields: [drawSessionId], references: [id], onDelete: Cascade)
+  team          Team?       @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  @@index([drawSessionId, createdAt])
+}
+
+model Match {
+  id         Int         @id @default(autoincrement())
+  divisionId Int
+  stage      MatchStage  @default(GROUP)
+  groupCode  GroupCode?
+  round      Int         @default(1)
+  homeTeamId Int
+  awayTeamId Int
+  homeScore  Int?
+  awayScore  Int?
+  kickoffAt  DateTime?
+  field      String?
+  status     MatchStatus @default(SCHEDULED)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  division   Division    @relation(fields: [divisionId], references: [id], onDelete: Cascade)
+  home       Team        @relation("home", fields: [homeTeamId], references: [id])
+  away       Team        @relation("away", fields: [awayTeamId], references: [id])
+
+  @@index([divisionId, stage, groupCode])
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  divisionId Int
+  entityType String
+  entityId   String
+  action     String
+  actor      String?
+  payload    Json?
+  createdAt  DateTime @default(now())
+  division   Division @relation(fields: [divisionId], references: [id], onDelete: Cascade)
+
+  @@index([divisionId, createdAt])
+}

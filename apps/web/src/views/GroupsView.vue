@@ -1,2 +1,7 @@
-<script setup lang="ts">import TopBar from '../components/TopBar.vue';import GroupCard from '../components/GroupCard.vue';import {useTournamentStore} from'../stores/tournament';const s=useTournamentStore()</script>
+<script setup lang="ts">
+import TopBar from '../components/TopBar.vue'
+import GroupCard from '../components/GroupCard.vue'
+import {useTournamentStore} from '../stores/tournament'
+const s=useTournamentStore()
+</script>
 <template><div class="page"><TopBar/><main class="content"><h2>ผลการแบ่งสาย — {{s.division.name}}</h2><div class="group-grid"><GroupCard name="A" :teams="s.groups.A"/><GroupCard name="B" :teams="s.groups.B"/><GroupCard name="C" :teams="s.groups.C"/><GroupCard name="D" :teams="s.groups.D"/></div><div class="center"><button class="btn gold" @click="s.generateMatches">สร้างตารางแข่งขันอัตโนมัติ</button></div></main></div></template>

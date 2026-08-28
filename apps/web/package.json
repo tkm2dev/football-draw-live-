@@ -3,13 +3,12 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "scripts": {"dev":"vite","build":"vue-tsc -b && vite build"},
+  "scripts": {"dev":"vite","build":"vue-tsc --noEmit && vite build"},
   "dependencies": {
-    "@vitejs/plugin-vue":"latest",
-    "pinia":"latest",
-    "socket.io-client":"latest",
-    "vue":"latest",
-    "vue-router":"latest"
+    "pinia":"3.0.3",
+    "socket.io-client":"4.8.1",
+    "vue":"3.5.21",
+    "vue-router":"4.5.1"
   },
-  "devDependencies": {"typescript":"latest","vite":"latest","vue-tsc":"latest"}
+  "devDependencies": {"@vitejs/plugin-vue":"6.0.1","typescript":"5.9.2","vite":"7.3.6","vue-tsc":"3.0.6"}
 }

@@ -1,2 +1,9 @@
-<script setup lang="ts">import{onMounted}from'vue';import TopBar from'../components/TopBar.vue';import{useTournamentStore}from'../stores/tournament';const s=useTournamentStore();onMounted(()=>s.loadTournament());const stages=['QF','SF','FINAL'] as const</script>
+<script setup lang="ts">
+import {onMounted} from 'vue'
+import TopBar from '../components/TopBar.vue'
+import {useTournamentStore} from '../stores/tournament'
+const s=useTournamentStore()
+onMounted(()=>s.loadTournament())
+const stages=['QF','SF','FINAL'] as const
+</script>
 <template><div class="page"><TopBar/><main class="content"><div class="toolbar"><div><div class="eyebrow">KNOCKOUT</div><h2>รอบน็อกเอาต์</h2></div><div class="actions"><button class="btn" @click="s.generateKnockout">สร้าง QF</button><button class="btn gold" @click="s.advanceKnockout">เลื่อนรอบถัดไป</button></div></div><div class="bracket"><section v-for="stage in stages" :key="stage" class="bracket-col"><h3>{{stage==='QF'?'รอบ 8 ทีม':stage==='SF'?'รอบรอง':'รอบชิง'}}</h3><article v-for="m in s.knockoutMatches.filter(x=>x.stage===stage)" :key="m.id" class="bracket-match"><div><span>{{m.home.name}}</span><input type="number" min="0" v-model.number="m.homeScore"></div><div><span>{{m.away.name}}</span><input type="number" min="0" v-model.number="m.awayScore"></div><button class="mini" @click="s.saveScore(m)">บันทึกผล</button></article><div v-if="!s.knockoutMatches.some(x=>x.stage===stage)" class="empty-slot">รอผลการแข่งขัน</div></section></div></main></div></template>

@@ -1,6 +1,6 @@
 export type DivisionKey='PUBLIC'|'SENIOR40'
 export type GroupCode='A'|'B'|'C'|'D'
-export interface Team{id:string;name:string;seed?:boolean}
+export interface Team{id:string;name:string;seed?:boolean;logoUrl?:string}
 export interface GroupMap{A:Team[];B:Team[];C:Team[];D:Team[]}
 export interface Division{key:DivisionKey;name:string;subtitle:string;teams:Team[]}
 export interface Match{id:string;divisionKey?:DivisionKey;stage:'GROUP'|'QF'|'SF'|'FINAL';group?:GroupCode;home:Team;away:Team;round:number;homeScore:number|null;awayScore:number|null;status:'SCHEDULED'|'LIVE'|'FINISHED';kickoffAt?:string|null;field?:string}

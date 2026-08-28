@@ -34,6 +34,7 @@ export const useTournamentStore=defineStore('tournament',{
     async loadTournament(){const state=await json(await fetch(`${api}/api/tournament/${this.divisionKey}`));this.matches=state.matches||[];this.standings=state.standings||this.standings},
     async post(url:string,body:unknown){return json(await fetch(`${api}${url}`,{method:'POST',headers:writeHeaders,body:JSON.stringify(body)}))},
     async saveTeamConfiguration(teams:{code:string;name:string}[],separateTeamCodes:string[]){this.applyState(await json(await fetch(`${api}/api/divisions/${this.divisionKey}/teams`,{method:'PUT',headers:writeHeaders,body:JSON.stringify({teams,separateTeamCodes})})))},
+    async uploadTeamLogo(teamCode:string,file:File){const body=new FormData();body.append('logo',file);const state=await json(await fetch(`${api}/api/teams/${this.divisionKey}/${teamCode}/logo`,{method:'POST',headers:{'x-admin-user':'draw-control'},body}));this.applyState(state);return state as DrawState},
     async reset(){this.applyState(await this.post('/api/draw/reset',{divisionKey:this.divisionKey}));this.matches=[];this.standings={A:[],B:[],C:[],D:[]}},
     async drawNext(){this.applyState(await this.post('/api/draw/next',{divisionKey:this.divisionKey}))},
     async drawAll(){this.applyState(await this.post('/api/draw/all',{divisionKey:this.divisionKey}))},

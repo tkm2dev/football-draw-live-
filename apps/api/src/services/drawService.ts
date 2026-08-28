@@ -4,7 +4,7 @@ import {prisma} from '../db.js'
 import {chooseNextAssignment,emptyAssignments,parseRules,GROUP_CODES,type AssignmentMap,type DivisionKey,type DrawTeam,type GroupCode} from './drawEngine.js'
 
 export interface AuditContext{actor?:string;ip?:string}
-export interface ApiTeam{id:string;name:string;seed:boolean}
+export interface ApiTeam{id:string;name:string;seed:boolean;logoUrl?:string}
 export interface DrawEventView{id:string;at:string;eventType:string;message:string;team?:ApiTeam;group?:GroupCode;actor?:string}
 export interface DrawState{
   sessionId:string;divisionKey:DivisionKey;groups:Record<GroupCode,ApiTeam[]>;drawnIds:string[];totalTeams:number
@@ -13,7 +13,7 @@ export interface DrawState{
 
 type Tx=Prisma.TransactionClient
 const dbRandom=()=>randomInt(0,0x100000000)/0x100000000
-const apiTeam=(team:{code:string;name:string;isSeed:boolean}):ApiTeam=>({id:team.code,name:team.name,seed:team.isSeed})
+const apiTeam=(team:{code:string;name:string;isSeed:boolean;logoUrl:string|null}):ApiTeam=>({id:team.code,name:team.name,seed:team.isSeed,logoUrl:team.logoUrl??undefined})
 const domainTeam=(team:{id:number;code:string;name:string;isSeed:boolean}):DrawTeam=>({id:team.id,code:team.code,name:team.name,seed:team.isSeed})
 
 async function divisionByType(tx:Tx,divisionKey:DivisionKey){
@@ -72,6 +72,21 @@ async function stateInTransaction(tx:Tx,divisionKey:DivisionKey):Promise<DrawSta
 }
 
 export interface TeamConfigurationInput{code:string;name:string}
+
+export async function updateTeamLogo(divisionKey:DivisionKey,teamCode:string,logoUrl:string,context:AuditContext={}):Promise<{state:DrawState;previousLogoUrl:string|null}>{
+  return serializable(async tx=>{
+    const division=await divisionByType(tx,divisionKey)
+    const session=await currentSession(tx,division.id)
+    await lockSession(tx,session.id)
+    const team=division.teams.find(team=>team.code===teamCode)
+    if(!team)throw new Error('ไม่พบทีมในรุ่นการแข่งขันนี้')
+    const previousLogoUrl=team.logoUrl
+    await tx.team.update({where:{id:team.id},data:{logoUrl}})
+    await tx.drawEvent.create({data:{drawSessionId:session.id,teamId:team.id,eventType:'CONFIG',message:`อัปเดตโลโก้ ${team.name}`,actor:context.actor,metadata:{ip:context.ip??null,teamCode,logoUrl}}})
+    await audit(tx,division.id,'TEAM',String(team.id),'UPDATE_TEAM_LOGO',context,{teamCode,previousLogoUrl,logoUrl})
+    return{state:await stateInTransaction(tx,divisionKey),previousLogoUrl}
+  })
+}
 
 export async function updateTeamConfiguration(divisionKey:DivisionKey,teams:TeamConfigurationInput[],separateTeamCodes:string[],context:AuditContext={}):Promise<DrawState>{
   return serializable(async tx=>{

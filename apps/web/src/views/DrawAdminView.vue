@@ -9,7 +9,8 @@ const store=useTournamentStore()
 const busy=ref(false)
 const message=ref('')
 const editingTeams=ref(false)
-const teamDraft=ref<Array<{code:string;name:string;separate:boolean}>>([])
+const teamDraft=ref<Array<{code:string;name:string;logoUrl?:string;separate:boolean}>>([])
+const uploadingCode=ref('')
 const statusLabel=computed(()=>({READY:'พร้อมเริ่ม',LIVE:'กำลังถ่ายทอดสด',COMPLETED:'จับครบแล้ว',LOCKED:'ผลอย่างเป็นทางการ'})[store.status])
 const liveUrl=computed(()=>`/live/draw?division=${store.divisionKey}&projector=1`)
 const canEditTeams=computed(()=>!store.locked)
@@ -21,7 +22,7 @@ async function run(action:()=>Promise<void>){busy.value=true;message.value='';tr
 async function reset(){if(window.confirm('เริ่มพิธีใหม่? ผลแบ่งสายและตารางแข่งขันของรุ่นนี้จะถูกล้าง'))await run(store.reset)}
 async function changeDivision(){editingTeams.value=false;await store.setDivision(store.divisionKey)}
 function openTeamEditor(){
-  teamDraft.value=store.teams.map(team=>({code:team.id,name:team.name,separate:store.separateTeamCodes.includes(team.id)}))
+  teamDraft.value=store.teams.map(team=>({code:team.id,name:team.name,logoUrl:team.logoUrl,separate:store.separateTeamCodes.includes(team.id)}))
   editingTeams.value=true
 }
 async function saveTeamConfiguration(){
@@ -30,6 +31,17 @@ async function saveTeamConfiguration(){
     await store.saveTeamConfiguration(teamDraft.value.map(({code,name})=>({code,name})),store.divisionKey==='SENIOR40'?teamDraft.value.filter(team=>team.separate).map(team=>team.code):[])
     editingTeams.value=false
   })
+}
+async function uploadLogo(team:{code:string;logoUrl?:string},event:Event){
+  const input=event.target as HTMLInputElement
+  const file=input.files?.[0]
+  if(!file)return
+  if(file.size>5*1024*1024){message.value='ไฟล์โลโก้ต้องไม่เกิน 5 MB';input.value='';return}
+  uploadingCode.value=team.code;message.value=''
+  try{
+    const state=await store.uploadTeamLogo(team.code,file)
+    team.logoUrl=state.teams.find(item=>item.id===team.code)?.logoUrl
+  }catch(error){message.value=error instanceof Error?error.message:'อัปโหลดโลโก้ไม่สำเร็จ'}finally{uploadingCode.value='';input.value=''}
 }
 </script>
 
@@ -64,6 +76,7 @@ async function saveTeamConfiguration(){
           <div class="team-editor-grid">
             <label v-for="(team,index) in teamDraft" :key="team.code" class="team-edit-row">
               <span class="team-edit-number">{{index+1}}</span>
+              <span class="logo-upload" :class="{uploading:uploadingCode===team.code,ready:team.logoUrl}"><img v-if="team.logoUrl" :src="team.logoUrl" alt=""><b v-else>{{uploadingCode===team.code?'…':'＋'}}</b><input type="file" accept="image/png,image/jpeg,image/webp" :disabled="Boolean(uploadingCode)" :aria-label="`อัปโหลดโลโก้ ${team.name}`" @change="uploadLogo(team,$event)"><em>{{team.logoUrl?'เปลี่ยน':'โลโก้'}}</em></span>
               <span class="team-edit-fields"><small>{{team.code.toUpperCase()}}</small><input v-model.trim="team.name" maxlength="120" placeholder="ชื่อทีม"></span>
               <span v-if="store.divisionKey==='SENIOR40'" class="constraint-check"><input v-model="team.separate" type="checkbox" :disabled="drawStarted||(!team.separate&&selectedSeparateCount>=3)"><i></i><em>แยกสาย</em></span>
             </label>

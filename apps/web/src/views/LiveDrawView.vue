@@ -40,7 +40,7 @@ onBeforeUnmount(()=>window.clearInterval(timer))
         <Transition name="broadcast-reveal" mode="out-in">
           <div :key="store.currentReveal?.team.id||store.status" class="reveal-result">
             <span v-if="store.currentReveal" class="reveal-sweep" aria-hidden="true"></span>
-            <template v-if="store.currentReveal"><div class="ball-seal">⚽<i></i></div><div class="revealed-team"><small>TEAM REVEALED</small><strong>{{store.currentReveal.team.name}}</strong></div><div class="group-reveal"><small>GROUP</small><b>{{store.currentReveal.group}}</b></div></template>
+            <template v-if="store.currentReveal"><div class="ball-seal" :class="{'has-team-logo':store.currentReveal.team.logoUrl}"><img v-if="store.currentReveal.team.logoUrl" :src="store.currentReveal.team.logoUrl" :alt="`โลโก้ ${store.currentReveal.team.name}`"><template v-else>⚽</template><i></i></div><div class="revealed-team"><small>TEAM REVEALED</small><strong>{{store.currentReveal.team.name}}</strong></div><div class="group-reveal"><small>GROUP</small><b>{{store.currentReveal.group}}</b></div></template>
             <template v-else><div class="ball-seal standby">13</div><div class="revealed-team"><small>OFFICIAL LIVE DRAW</small><strong>กำลังรอการจับสลาก</strong></div><div class="group-reveal idle"><small>GROUP</small><b>–</b></div></template>
           </div>
         </Transition>

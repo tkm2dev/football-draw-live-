@@ -22,7 +22,7 @@ integration('Prisma/MySQL draw and match persistence',()=>{
   })
 
   it('updates team names and the three senior separation teams with an audit entry',async()=>{
-    const {getDrawState,updateTeamConfiguration}=await import('../drawService.js')
+    const {getDrawState,updateTeamConfiguration,updateTeamLogo}=await import('../drawService.js')
     const {prisma}=await import('../../db.js')
     const initial=await getDrawState('SENIOR40')
     const teams=initial.teams.map(team=>({code:team.id,name:team.id==='s1'?'สมประสงค์ ยูไนเต็ด':team.name}))
@@ -31,6 +31,10 @@ integration('Prisma/MySQL draw and match persistence',()=>{
     expect(updated.separateTeamCodes).toEqual(['s1','s4','s9'])
     expect(await prisma.team.count({where:{division:{type:'SENIOR40'},isSeed:true}})).toBe(3)
     expect(await prisma.auditLog.count({where:{action:'UPDATE_TEAM_CONFIGURATION'}})).toBe(1)
+    const logoUrl='/uploads/team-logos/550e8400-e29b-41d4-a716-446655440000.png'
+    const logo=await updateTeamLogo('SENIOR40','s1',logoUrl,{actor:'integration-test'})
+    expect(logo.state.teams.find(team=>team.id==='s1')?.logoUrl).toBe(logoUrl)
+    expect(await prisma.auditLog.count({where:{action:'UPDATE_TEAM_LOGO'}})).toBe(1)
   })
 
   it('commits assignments, session events, snapshots and audit rows atomically',async()=>{

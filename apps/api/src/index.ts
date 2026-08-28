@@ -4,12 +4,16 @@ import cors from 'cors'
 import {createServer} from 'node:http'
 import {fileURLToPath} from 'node:url'
 import path from 'node:path'
+import {mkdir,unlink,writeFile} from 'node:fs/promises'
+import {randomUUID} from 'node:crypto'
+import multer,{MulterError} from 'multer'
 import {Server} from 'socket.io'
 import {z} from 'zod'
 import {prisma,disconnectDb} from './db.js'
-import {drawAll,drawNext,getDrawState,resetDraw,setDrawLock,updateTeamConfiguration,type AuditContext} from './services/drawService.js'
+import {drawAll,drawNext,getDrawState,resetDraw,setDrawLock,updateTeamConfiguration,updateTeamLogo,type AuditContext} from './services/drawService.js'
 import {advanceKnockout,generateGroupMatches,generateKnockout,listMatches,standings,summary,updateMatch} from './services/tournamentEngine.js'
 import type {DivisionKey} from './services/drawEngine.js'
+import {logoExtension,MAX_LOGO_BYTES,storedLogoPath} from './uploads.js'
 
 const app=express()
 app.set('trust proxy',1)
@@ -19,6 +23,9 @@ const corsOptions:cors.CorsOptions={origin:(origin,callback)=>callback(null,!ori
 const io=new Server(server,{cors:corsOptions})
 app.use(cors(corsOptions))
 app.use(express.json({limit:'2mb'}))
+const uploadRoot=path.resolve(process.env.UPLOAD_DIR||path.join(process.cwd(),'uploads'))
+const logoUpload=multer({storage:multer.memoryStorage(),limits:{fileSize:MAX_LOGO_BYTES,files:1}})
+app.use('/uploads',express.static(uploadRoot,{dotfiles:'deny',fallthrough:true,maxAge:'30d',immutable:true}))
 
 const Division=z.enum(['PUBLIC','SENIOR40'])
 const DivisionBody=z.object({divisionKey:Division})
@@ -39,6 +46,26 @@ app.get('/api/health',route(async(_req,res)=>{
 }))
 app.get('/api/draw/:division',route(async(req,res)=>{res.json(await getDrawState(Division.parse(req.params.division)))}))
 app.put('/api/divisions/:division/teams',route(async(req,res)=>{const key=Division.parse(req.params.division);const body=TeamConfigurationBody.parse(req.body);const state=await updateTeamConfiguration(key,body.teams,body.separateTeamCodes,context(req));await emit(key,state);res.json(state)}))
+app.post('/api/teams/:division/:code/logo',logoUpload.single('logo'),route(async(req,res)=>{
+  const key=Division.parse(req.params.division)
+  const teamCode=z.string().min(1).max(30).parse(req.params.code)
+  if(!req.file){res.status(400).json({message:'กรุณาเลือกไฟล์โลโก้'});return}
+  const extension=logoExtension(req.file.buffer)
+  if(!extension){res.status(400).json({message:'รองรับเฉพาะไฟล์ PNG, JPG และ WebP'});return}
+  const logoDirectory=path.join(uploadRoot,'team-logos')
+  await mkdir(logoDirectory,{recursive:true})
+  const filename=`${randomUUID()}.${extension}`
+  const filePath=path.join(logoDirectory,filename)
+  const logoUrl=`/uploads/team-logos/${filename}`
+  await writeFile(filePath,req.file.buffer,{flag:'wx'})
+  try{
+    const result=await updateTeamLogo(key,teamCode,logoUrl,context(req))
+    const previousPath=storedLogoPath(uploadRoot,result.previousLogoUrl)
+    if(previousPath&&previousPath!==filePath)await unlink(previousPath).catch(()=>undefined)
+    await emit(key,result.state)
+    res.json(result.state)
+  }catch(error){await unlink(filePath).catch(()=>undefined);throw error}
+}))
 app.post('/api/draw/reset',route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;const state=await resetDraw(key,context(req));await emit(key,state);res.json(state)}))
 app.post('/api/draw/next',route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;const state=await drawNext(key,context(req));await emit(key,state);res.json(state)}))
 app.post('/api/draw/all',route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;const state=await drawAll(key,context(req));await emit(key,state);res.json(state)}))
@@ -67,6 +94,7 @@ const webDist=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../w
 app.use(express.static(webDist))
 app.get(/^(?!\/api|\/socket\.io).*/,(_req,res)=>res.sendFile(path.join(webDist,'index.html')))
 app.use((error:unknown,_req:Request,res:Response,_next:NextFunction)=>{
+  if(error instanceof MulterError){res.status(400).json({message:error.code==='LIMIT_FILE_SIZE'?'ไฟล์โลโก้ต้องไม่เกิน 5 MB':'อัปโหลดโลโก้ไม่สำเร็จ'});return}
   if(error instanceof z.ZodError){res.status(400).json({message:'ข้อมูลที่ส่งมาไม่ถูกต้อง',issues:error.issues});return}
   const message=error instanceof Error?error.message:'เกิดข้อผิดพลาดภายในระบบ'
   console.error(error)

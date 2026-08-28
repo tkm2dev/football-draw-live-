@@ -7,9 +7,13 @@ const integration=describe.skipIf(!testDatabase)
 integration('Prisma/MySQL draw and match persistence',()=>{
   beforeAll(async()=>{
     process.env.DATABASE_URL=testDatabase
-    const npx=process.platform==='win32'?'npx.cmd':'npx'
-    execFileSync(npx,['prisma','migrate','reset','--force','--skip-seed'],{cwd:new URL('../../../../../',import.meta.url),env:process.env,stdio:'pipe'})
-    execFileSync(npx,['tsx','prisma/seed.ts'],{cwd:new URL('../../../../../',import.meta.url),env:process.env,stdio:'pipe'})
+    const runNpx=(args:string[])=>{
+      const command=process.platform==='win32'?(process.env.ComSpec??'cmd.exe'):'npx'
+      const commandArgs=process.platform==='win32'?['/d','/s','/c','npx',...args]:args
+      execFileSync(command,commandArgs,{cwd:new URL('../../../../../',import.meta.url),env:process.env,stdio:'pipe'})
+    }
+    runNpx(['prisma','migrate','reset','--force','--skip-seed'])
+    runNpx(['tsx','prisma/seed.ts'])
   },60_000)
 
   afterAll(async()=>{

@@ -59,7 +59,7 @@ async function saveTeamConfiguration(){
         <div v-if="store.divisionKey==='SENIOR40'" class="rule-banner"><span>◆</span><div><b>กติกาบังคับรุ่นอาวุโส</b><p>{{separateTeamNames}} ต้องอยู่คนละสายเสมอ</p></div><strong>ENFORCED</strong></div>
 
         <section v-if="editingTeams" class="team-editor-panel">
-          <header><div><div class="eyebrow">TEAM CONFIGURATION</div><h2>แก้ไขรายชื่อทีม{{store.divisionKey==='SENIOR40'?'และกติกาบังคับ':''}}</h2><p>บันทึกได้ก่อนเริ่มจับสลากเท่านั้น การเปลี่ยนแปลงทุกครั้งจะถูกเก็บใน Audit Log</p></div><button class="editor-close" title="ปิด" @click="editingTeams=false">×</button></header>
+          <header><div><div class="eyebrow">TEAM CONFIGURATION</div><h2>แก้ไขรายชื่อทีม{{store.divisionKey==='SENIOR40'?'และกติกาบังคับ':''}}</h2><p>{{drawStarted?'แก้ชื่อทีมได้ระหว่างพิธี โดยคงกติกาบังคับเดิมไว้':'ก่อนเริ่มจับสามารถแก้ชื่อและกติกาบังคับได้'}} การเปลี่ยนแปลงทุกครั้งจะถูกเก็บใน Audit Log</p></div><button class="editor-close" title="ปิด" @click="editingTeams=false">×</button></header>
           <div v-if="store.divisionKey==='SENIOR40'" :class="['constraint-counter',{valid:selectedSeparateCount===3}]"><b>{{selectedSeparateCount}} / 3</b><span>{{drawStarted?'เริ่มจับแล้ว — แก้ชื่อได้ แต่เปลี่ยนทีมบังคับไม่ได้':'ทีมบังคับแยกสายที่เลือก'}}</span></div>
           <div class="team-editor-grid">
             <label v-for="(team,index) in teamDraft" :key="team.code" class="team-edit-row">
@@ -68,7 +68,7 @@ async function saveTeamConfiguration(){
               <span v-if="store.divisionKey==='SENIOR40'" class="constraint-check"><input v-model="team.separate" type="checkbox" :disabled="drawStarted||(!team.separate&&selectedSeparateCount>=3)"><i></i><em>แยกสาย</em></span>
             </label>
           </div>
-          <footer><button class="btn" :disabled="busy" @click="editingTeams=false">ยกเลิก</button><button class="btn gold" :disabled="busy||(store.divisionKey==='SENIOR40'&&selectedSeparateCount!==3)" @click="saveTeamConfiguration">{{busy?'กำลังบันทึก...':'บันทึกรายชื่อและกติกา'}}</button></footer>
+          <footer><button class="btn" :disabled="busy" @click="editingTeams=false">ยกเลิก</button><button class="btn gold" :disabled="busy||(store.divisionKey==='SENIOR40'&&selectedSeparateCount!==3)" @click="saveTeamConfiguration">{{busy?'กำลังบันทึก...':drawStarted?'บันทึกชื่อทีม':'บันทึกรายชื่อและกติกา'}}</button></footer>
         </section>
 
         <section class="draw-stage broadcast-panel">

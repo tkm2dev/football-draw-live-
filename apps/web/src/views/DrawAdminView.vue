@@ -12,7 +12,8 @@ const editingTeams=ref(false)
 const teamDraft=ref<Array<{code:string;name:string;separate:boolean}>>([])
 const statusLabel=computed(()=>({READY:'พร้อมเริ่ม',LIVE:'กำลังถ่ายทอดสด',COMPLETED:'จับครบแล้ว',LOCKED:'ผลอย่างเป็นทางการ'})[store.status])
 const liveUrl=computed(()=>`/live/draw?division=${store.divisionKey}&projector=1`)
-const canEditTeams=computed(()=>store.drawnIds.length===0&&!store.locked)
+const canEditTeams=computed(()=>!store.locked)
+const drawStarted=computed(()=>store.drawnIds.length>0)
 const selectedSeparateCount=computed(()=>teamDraft.value.filter(team=>team.separate).length)
 const separateTeamNames=computed(()=>store.separateTeamCodes.map(code=>store.teams.find(team=>team.id===code)?.name).filter(Boolean).join(', '))
 onMounted(async()=>{store.connect();await store.loadState()})
@@ -59,12 +60,12 @@ async function saveTeamConfiguration(){
 
         <section v-if="editingTeams" class="team-editor-panel">
           <header><div><div class="eyebrow">TEAM CONFIGURATION</div><h2>แก้ไขรายชื่อทีม{{store.divisionKey==='SENIOR40'?'และกติกาบังคับ':''}}</h2><p>บันทึกได้ก่อนเริ่มจับสลากเท่านั้น การเปลี่ยนแปลงทุกครั้งจะถูกเก็บใน Audit Log</p></div><button class="editor-close" title="ปิด" @click="editingTeams=false">×</button></header>
-          <div v-if="store.divisionKey==='SENIOR40'" :class="['constraint-counter',{valid:selectedSeparateCount===3}]"><b>{{selectedSeparateCount}} / 3</b><span>ทีมบังคับแยกสายที่เลือก</span></div>
+          <div v-if="store.divisionKey==='SENIOR40'" :class="['constraint-counter',{valid:selectedSeparateCount===3}]"><b>{{selectedSeparateCount}} / 3</b><span>{{drawStarted?'เริ่มจับแล้ว — แก้ชื่อได้ แต่เปลี่ยนทีมบังคับไม่ได้':'ทีมบังคับแยกสายที่เลือก'}}</span></div>
           <div class="team-editor-grid">
             <label v-for="(team,index) in teamDraft" :key="team.code" class="team-edit-row">
               <span class="team-edit-number">{{index+1}}</span>
               <span class="team-edit-fields"><small>{{team.code.toUpperCase()}}</small><input v-model.trim="team.name" maxlength="120" placeholder="ชื่อทีม"></span>
-              <span v-if="store.divisionKey==='SENIOR40'" class="constraint-check"><input v-model="team.separate" type="checkbox" :disabled="!team.separate&&selectedSeparateCount>=3"><i></i><em>แยกสาย</em></span>
+              <span v-if="store.divisionKey==='SENIOR40'" class="constraint-check"><input v-model="team.separate" type="checkbox" :disabled="drawStarted||(!team.separate&&selectedSeparateCount>=3)"><i></i><em>แยกสาย</em></span>
             </label>
           </div>
           <footer><button class="btn" :disabled="busy" @click="editingTeams=false">ยกเลิก</button><button class="btn gold" :disabled="busy||(store.divisionKey==='SENIOR40'&&selectedSeparateCount!==3)" @click="saveTeamConfiguration">{{busy?'กำลังบันทึก...':'บันทึกรายชื่อและกติกา'}}</button></footer>
@@ -87,7 +88,7 @@ async function saveTeamConfiguration(){
       </section>
 
       <aside class="control-rail">
-        <section class="rail-card team-management-card"><div class="rail-icon">✎</div><div class="eyebrow">TEAM MANAGEMENT</div><h3>รายชื่อทีมและกติกา</h3><p>แก้ไขชื่อทีมทั้ง 12 ทีม{{store.divisionKey==='SENIOR40'?' และเลือก 3 ทีมที่ต้องอยู่คนละสาย':''}}</p><button class="btn full" :disabled="busy||!canEditTeams" @click="openTeamEditor">แก้ไขทีม</button><small v-if="!canEditTeams">เริ่มพิธีใหม่และล้างผลก่อนจึงจะแก้ไขได้</small></section>
+        <section class="rail-card team-management-card"><div class="rail-icon">✎</div><div class="eyebrow">TEAM MANAGEMENT</div><h3>รายชื่อทีมและกติกา</h3><p>แก้ไขชื่อทีมทั้ง 12 ทีม{{store.divisionKey==='SENIOR40'?' และเลือก 3 ทีมที่ต้องอยู่คนละสาย':''}}</p><button class="btn full" :disabled="busy||!canEditTeams" @click="openTeamEditor">{{drawStarted?'แก้ไขชื่อทีม':'แก้ไขทีมและกติกา'}}</button><small v-if="drawStarted&&!store.locked">เริ่มจับแล้ว: เปลี่ยนชื่อได้ แต่ทีมบังคับจะถูกล็อกไว้</small><small v-if="store.locked">ปลดล็อกผลก่อนจึงจะแก้ไขชื่อทีมได้</small></section>
         <section class="rail-card output-card"><div class="rail-icon">▣</div><div class="eyebrow">PROGRAM OUTPUT</div><h3>Live Draw 16:9</h3><p>สำหรับ Projector, TV หรือ OBS พร้อมโหมดเต็มจอ</p><a class="btn gold full" :href="liveUrl" target="_blank">เปิดจอถ่ายทอดสด ↗</a></section>
         <section class="rail-card security-card"><div class="eyebrow">RESULT SECURITY</div><h3>{{store.locked?'Official Result Locked':'ยืนยันผลอย่างเป็นทางการ'}}</h3><p>{{store.locked?'ระบบป้องกันการจับซ้ำและแก้ผลแล้ว':'ล็อกได้เมื่อจับครบ '+store.totalTeams+' ทีม'}}</p><button class="btn full" :class="{danger:store.locked}" :disabled="busy || (!store.locked && store.drawnIds.length<store.totalTeams)" @click="run(store.toggleLock)">{{store.locked?'ปลดล็อกผล':'ล็อกผลการจับสลาก'}}</button></section>
         <section class="rail-card timeline-card"><div class="timeline-head"><div><div class="eyebrow">AUDIT TIMELINE</div><h3>ประวัติการควบคุม</h3></div><span>{{store.events.length}}</span></div><div v-if="store.events.length" class="audit-timeline"><div v-for="event in store.events.slice(0,12)" :key="event.id" :class="['audit-event',event.eventType.toLowerCase()]"><i></i><div><time>{{new Date(event.at).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}}</time><p>{{event.message}}</p><small v-if="event.actor">โดย {{event.actor}}</small></div></div></div><p v-else class="muted">ยังไม่มีกิจกรรมในรอบนี้</p></section>

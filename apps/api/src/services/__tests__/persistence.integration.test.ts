@@ -34,7 +34,7 @@ integration('Prisma/MySQL draw and match persistence',()=>{
   })
 
   it('commits assignments, session events, snapshots and audit rows atomically',async()=>{
-    const {drawAll,getDrawState,resetDraw,setDrawLock}=await import('../drawService.js')
+    const {drawAll,getDrawState,resetDraw,setDrawLock,updateTeamConfiguration}=await import('../drawService.js')
     const {prisma,disconnectDb}=await import('../../db.js')
     await resetDraw('SENIOR40',{actor:'integration-test'})
     const completed=await drawAll('SENIOR40',{actor:'integration-test'})
@@ -45,6 +45,11 @@ integration('Prisma/MySQL draw and match persistence',()=>{
     expect(await prisma.auditLog.count({where:{action:'DRAW_TEAM'}})).toBe(12)
     const separated=Object.entries(completed.groups).filter(([,teams])=>teams.some(team=>['s1','s4','s9'].includes(team.id))).map(([group])=>group)
     expect(new Set(separated).size).toBe(3)
+    const renamed=completed.teams.map(team=>({code:team.id,name:team.id==='s2'?'เพื่อนเยาวชน VIP':team.name}))
+    const renamedState=await updateTeamConfiguration('SENIOR40',renamed,['s1','s4','s9'],{actor:'integration-test'})
+    expect(renamedState.teams.find(team=>team.id==='s2')?.name).toBe('เพื่อนเยาวชน VIP')
+    await expect(updateTeamConfiguration('SENIOR40',renamed,['s2','s4','s9'],{actor:'integration-test'})).rejects.toThrow(/เปลี่ยน 3 ทีมบังคับไม่ได้/)
+    expect(await prisma.auditLog.count({where:{action:'UPDATE_TEAM_NAMES'}})).toBe(1)
     await setDrawLock('SENIOR40',true,{actor:'integration-test'})
     await disconnectDb()
     const restored=await getDrawState('SENIOR40')

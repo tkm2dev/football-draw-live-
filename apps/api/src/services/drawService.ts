@@ -79,7 +79,7 @@ export async function updateTeamConfiguration(divisionKey:DivisionKey,teams:Team
     const session=await currentSession(tx,division.id)
     await lockSession(tx,session.id)
     const assigned=await tx.groupTeam.count({where:{group:{divisionId:division.id}}})
-    if(session.status===DrawStatus.LOCKED||assigned>0)throw new Error('แก้ไขทีมได้ก่อนเริ่มจับสลากเท่านั้น กรุณาเริ่มพิธีใหม่ก่อน')
+    if(session.status===DrawStatus.LOCKED)throw new Error('ผลถูกล็อกแล้ว กรุณาปลดล็อกก่อนแก้ไขชื่อทีม')
     if(teams.length!==division.teams.length||teams.length!==12)throw new Error('ต้องมีรายชื่อทีมครบ 12 ทีม')
     const existingCodes=new Set(division.teams.map(team=>team.code))
     const incomingCodes=new Set(teams.map(team=>team.code))
@@ -93,15 +93,22 @@ export async function updateTeamConfiguration(divisionKey:DivisionKey,teams:Team
 
     const previousTeams=division.teams.map(team=>({code:team.code,name:team.name,seed:team.isSeed}))
     const previousRules=await tx.drawRule.findMany({where:{divisionType:division.type,ruleType:'SEPARATE_TEAMS',active:true}})
+    const previousSeparateCodes=parseRules(previousRules).flatMap(rule=>rule.type==='SEPARATE_TEAMS'?rule.teamCodes:[])
+    const sameSeparateCodes=[...previousSeparateCodes].sort().join('|')===[...separateTeamCodes].sort().join('|')
+    if(assigned>0&&!sameSeparateCodes)throw new Error('เริ่มจับสลากแล้ว แก้ชื่อทีมได้แต่เปลี่ยน 3 ทีมบังคับไม่ได้')
     for(const team of division.teams)await tx.team.update({where:{id:team.id},data:{name:`__editing_${randomUUID()}`}})
     for(const team of normalized){
       const row=division.teams.find(existing=>existing.code===team.code)!
       await tx.team.update({where:{id:row.id},data:{name:team.name,isSeed:divisionKey==='SENIOR40'&&separateTeamCodes.includes(team.code)}})
     }
-    await tx.drawRule.deleteMany({where:{divisionType:division.type,ruleType:'SEPARATE_TEAMS'}})
-    if(divisionKey==='SENIOR40')await tx.drawRule.create({data:{divisionType:division.type,ruleType:'SEPARATE_TEAMS',payload:{teamCodes:separateTeamCodes,label:'ทีมบังคับรุ่นอาวุโสต้องอยู่คนละสาย'}}})
-    await tx.drawEvent.create({data:{drawSessionId:session.id,eventType:'CONFIG',message:'แก้ไขรายชื่อทีมและกติกาบังคับ',actor:context.actor,metadata:{ip:context.ip??null,separateTeamCodes}}})
-    await audit(tx,division.id,'DIVISION',String(division.id),'UPDATE_TEAM_CONFIGURATION',context,{previousTeams,previousRuleIds:previousRules.map(rule=>rule.id),teams:normalized,separateTeamCodes})
+    if(assigned===0){
+      await tx.drawRule.deleteMany({where:{divisionType:division.type,ruleType:'SEPARATE_TEAMS'}})
+      if(divisionKey==='SENIOR40')await tx.drawRule.create({data:{divisionType:division.type,ruleType:'SEPARATE_TEAMS',payload:{teamCodes:separateTeamCodes,label:'ทีมบังคับรุ่นอาวุโสต้องอยู่คนละสาย'}}})
+    }
+    const action=assigned>0?'UPDATE_TEAM_NAMES':'UPDATE_TEAM_CONFIGURATION'
+    const message=assigned>0?'แก้ไขชื่อทีมระหว่างพิธี':'แก้ไขรายชื่อทีมและกติกาบังคับ'
+    await tx.drawEvent.create({data:{drawSessionId:session.id,eventType:'CONFIG',message,actor:context.actor,metadata:{ip:context.ip??null,separateTeamCodes,assigned}}})
+    await audit(tx,division.id,'DIVISION',String(division.id),action,context,{previousTeams,previousRuleIds:previousRules.map(rule=>rule.id),teams:normalized,separateTeamCodes,assigned})
     return stateInTransaction(tx,divisionKey)
   })
 }

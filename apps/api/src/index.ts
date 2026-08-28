@@ -4,7 +4,6 @@ import cors from 'cors'
 import {createServer} from 'node:http'
 import {fileURLToPath} from 'node:url'
 import path from 'node:path'
-import {timingSafeEqual} from 'node:crypto'
 import {Server} from 'socket.io'
 import {z} from 'zod'
 import {prisma,disconnectDb} from './db.js'
@@ -26,15 +25,6 @@ const DivisionBody=z.object({divisionKey:Division})
 const MatchPatch=z.object({homeScore:z.number().int().min(0).nullable().optional(),awayScore:z.number().int().min(0).nullable().optional(),status:z.enum(['SCHEDULED','LIVE','FINISHED']).optional(),kickoffAt:z.iso.datetime().nullable().optional(),field:z.string().max(120).optional()})
 const route=(handler:(req:Request,res:Response)=>Promise<void>)=>(req:Request,res:Response,next:NextFunction)=>handler(req,res).catch(next)
 const context=(req:Request):AuditContext=>({actor:String(req.header('x-admin-user')||'draw-admin').slice(0,120),ip:req.ip})
-const adminKey=process.env.ADMIN_API_KEY||''
-const adminKeyReady=adminKey.length>=32
-const requireAdmin=(req:Request,res:Response,next:NextFunction)=>{
-  if(!adminKeyReady){if(process.env.NODE_ENV==='production'){res.status(503).json({message:'ADMIN_API_KEY บน production ต้องมีอย่างน้อย 32 ตัวอักษร'});return}next();return}
-  const supplied=req.header('x-admin-key')||''
-  const valid=supplied.length===adminKey.length&&timingSafeEqual(Buffer.from(supplied),Buffer.from(adminKey))
-  if(!valid){res.status(401).json({message:'Admin key ไม่ถูกต้อง'});return}
-  next()
-}
 
 async function emit(key:DivisionKey,state?:Awaited<ReturnType<typeof getDrawState>>){
   const nextState=state??await getDrawState(key)
@@ -43,21 +33,21 @@ async function emit(key:DivisionKey,state?:Awaited<ReturnType<typeof getDrawStat
 }
 
 app.get('/api/health',route(async(_req,res)=>{
-  try{await prisma.$queryRaw`SELECT 1`;res.json({ok:true,name:'Football Draw Live API',version:'2.0.0',database:'ready',adminSecurity:adminKeyReady?'ready':process.env.NODE_ENV==='production'?'missing-or-weak':'development',time:new Date().toISOString()})}
+  try{await prisma.$queryRaw`SELECT 1`;res.json({ok:true,name:'Football Draw Live API',version:'2.0.0',database:'ready',time:new Date().toISOString()})}
   catch{res.status(503).json({ok:false,name:'Football Draw Live API',version:'2.0.0',database:'unavailable'})}
 }))
 app.get('/api/draw/:division',route(async(req,res)=>{res.json(await getDrawState(Division.parse(req.params.division)))}))
-app.post('/api/draw/reset',requireAdmin,route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;const state=await resetDraw(key,context(req));await emit(key,state);res.json(state)}))
-app.post('/api/draw/next',requireAdmin,route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;const state=await drawNext(key,context(req));await emit(key,state);res.json(state)}))
-app.post('/api/draw/all',requireAdmin,route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;const state=await drawAll(key,context(req));await emit(key,state);res.json(state)}))
-app.post('/api/draw/lock',requireAdmin,route(async(req,res)=>{const body=DivisionBody.extend({locked:z.boolean()}).parse(req.body);const state=await setDrawLock(body.divisionKey,body.locked,context(req));await emit(body.divisionKey,state);res.json(state)}))
+app.post('/api/draw/reset',route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;const state=await resetDraw(key,context(req));await emit(key,state);res.json(state)}))
+app.post('/api/draw/next',route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;const state=await drawNext(key,context(req));await emit(key,state);res.json(state)}))
+app.post('/api/draw/all',route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;const state=await drawAll(key,context(req));await emit(key,state);res.json(state)}))
+app.post('/api/draw/lock',route(async(req,res)=>{const body=DivisionBody.extend({locked:z.boolean()}).parse(req.body);const state=await setDrawLock(body.divisionKey,body.locked,context(req));await emit(body.divisionKey,state);res.json(state)}))
 app.get('/api/tournament/:division',route(async(req,res)=>{res.json(await summary(Division.parse(req.params.division)))}))
-app.post('/api/matches/generate',requireAdmin,route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;const out=await generateGroupMatches(key,context(req));await emit(key);res.json(out)}))
+app.post('/api/matches/generate',route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;const out=await generateGroupMatches(key,context(req));await emit(key);res.json(out)}))
 app.get('/api/matches/:division',route(async(req,res)=>{res.json(await listMatches(Division.parse(req.params.division)))}))
-app.patch('/api/matches/:division/:id',requireAdmin,route(async(req,res)=>{const key=Division.parse(req.params.division);const match=await updateMatch(key,z.string().parse(req.params.id),MatchPatch.parse(req.body),context(req));await emit(key);res.json(match)}))
+app.patch('/api/matches/:division/:id',route(async(req,res)=>{const key=Division.parse(req.params.division);const match=await updateMatch(key,z.string().parse(req.params.id),MatchPatch.parse(req.body),context(req));await emit(key);res.json(match)}))
 app.get('/api/standings/:division',route(async(req,res)=>{res.json(await standings(Division.parse(req.params.division)))}))
-app.post('/api/knockout/generate',requireAdmin,route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;const out=await generateKnockout(key,context(req));await emit(key);res.json(out)}))
-app.post('/api/knockout/advance',requireAdmin,route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;const out=await advanceKnockout(key,context(req));await emit(key);res.json(out)}))
+app.post('/api/knockout/generate',route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;const out=await generateKnockout(key,context(req));await emit(key);res.json(out)}))
+app.post('/api/knockout/advance',route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;const out=await advanceKnockout(key,context(req));await emit(key);res.json(out)}))
 
 io.on('connection',socket=>{
   const watch=async(value:unknown)=>{

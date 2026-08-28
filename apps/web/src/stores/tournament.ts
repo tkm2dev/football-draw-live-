@@ -7,10 +7,10 @@ const emptyGroups=():GroupMap=>({A:[],B:[],C:[],D:[]})
 const configuredApi=(import.meta as any).env?.VITE_API_URL as string|undefined
 const api=configuredApi||((import.meta as any).env?.DEV?'http://localhost:4000':window.location.origin)
 async function json(response:Response){const data=await response.json();if(!response.ok)throw new Error(data.message||'เกิดข้อผิดพลาด');return data}
-const adminHeaders=(key:string)=>({'content-type':'application/json','x-admin-user':'draw-control',...(key?{'x-admin-key':key}:{})})
+const writeHeaders={'content-type':'application/json','x-admin-user':'draw-control'}
 
 export const useTournamentStore=defineStore('tournament',{
-  state:()=>({divisionKey:'SENIOR40' as DivisionKey,groups:emptyGroups(),drawnIds:[] as string[],totalTeams:12,currentReveal:null as null|{team:Team;group:GroupCode},matches:[] as Match[],standings:{A:[],B:[],C:[],D:[]} as Record<GroupCode,Standing[]>,socket:null as any,status:'READY' as DrawState['status'],locked:false,events:[] as DrawState['events'],lastError:'',connected:false,adminKey:sessionStorage.getItem('football-draw-admin-key')||''}),
+  state:()=>({divisionKey:'SENIOR40' as DivisionKey,groups:emptyGroups(),drawnIds:[] as string[],totalTeams:12,currentReveal:null as null|{team:Team;group:GroupCode},matches:[] as Match[],standings:{A:[],B:[],C:[],D:[]} as Record<GroupCode,Standing[]>,socket:null as any,status:'READY' as DrawState['status'],locked:false,events:[] as DrawState['events'],lastError:'',connected:false}),
   getters:{
     division:state=>divisions.find(division=>division.key===state.divisionKey)!,
     remaining:state=>divisions.find(division=>division.key===state.divisionKey)!.teams.filter(team=>!state.drawnIds.includes(team.id)),
@@ -20,7 +20,6 @@ export const useTournamentStore=defineStore('tournament',{
   },
   actions:{
     applyState(state:DrawState){this.groups=state.groups;this.drawnIds=state.drawnIds;this.totalTeams=state.totalTeams||12;this.currentReveal=state.currentReveal;this.status=state.status;this.locked=state.locked;this.events=state.events||[]},
-    setAdminKey(key:string){this.adminKey=key.trim();if(this.adminKey)sessionStorage.setItem('football-draw-admin-key',this.adminKey);else sessionStorage.removeItem('football-draw-admin-key')},
     async setDivision(key:DivisionKey){this.divisionKey=key;this.socket?.emit('watch:division',key);await Promise.all([this.loadState(),this.loadTournament()])},
     connect(){
       if(this.socket){this.socket.emit('watch:division',this.divisionKey);return}
@@ -33,13 +32,13 @@ export const useTournamentStore=defineStore('tournament',{
     },
     async loadState(){this.applyState(await json(await fetch(`${api}/api/draw/${this.divisionKey}`)))},
     async loadTournament(){const state=await json(await fetch(`${api}/api/tournament/${this.divisionKey}`));this.matches=state.matches||[];this.standings=state.standings||this.standings},
-    async post(url:string,body:unknown){return json(await fetch(`${api}${url}`,{method:'POST',headers:adminHeaders(this.adminKey),body:JSON.stringify(body)}))},
+    async post(url:string,body:unknown){return json(await fetch(`${api}${url}`,{method:'POST',headers:writeHeaders,body:JSON.stringify(body)}))},
     async reset(){this.applyState(await this.post('/api/draw/reset',{divisionKey:this.divisionKey}));this.matches=[];this.standings={A:[],B:[],C:[],D:[]}},
     async drawNext(){this.applyState(await this.post('/api/draw/next',{divisionKey:this.divisionKey}))},
     async drawAll(){this.applyState(await this.post('/api/draw/all',{divisionKey:this.divisionKey}))},
     async toggleLock(){this.applyState(await this.post('/api/draw/lock',{divisionKey:this.divisionKey,locked:!this.locked}))},
     async generateMatches(){this.matches=await this.post('/api/matches/generate',{divisionKey:this.divisionKey});await this.loadTournament()},
-    async saveScore(match:Match){await json(await fetch(`${api}/api/matches/${this.divisionKey}/${match.id}`,{method:'PATCH',headers:adminHeaders(this.adminKey),body:JSON.stringify({homeScore:match.homeScore,awayScore:match.awayScore,status:'FINISHED',kickoffAt:match.kickoffAt||null,field:match.field})}));await this.loadTournament()},
+    async saveScore(match:Match){await json(await fetch(`${api}/api/matches/${this.divisionKey}/${match.id}`,{method:'PATCH',headers:writeHeaders,body:JSON.stringify({homeScore:match.homeScore,awayScore:match.awayScore,status:'FINISHED',kickoffAt:match.kickoffAt||null,field:match.field})}));await this.loadTournament()},
     async generateKnockout(){await this.post('/api/knockout/generate',{divisionKey:this.divisionKey});await this.loadTournament()},
     async advanceKnockout(){await this.post('/api/knockout/advance',{divisionKey:this.divisionKey});await this.loadTournament()}
   }

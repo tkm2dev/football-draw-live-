@@ -7,7 +7,6 @@ The API serves the built Vue app, so PM2 exposes one private origin on port `314
 Obtain these before deployment. Do not invent or commit them:
 
 - MySQL admin access, or an existing database name/user/password
-- A random `ADMIN_API_KEY` of at least 32 characters
 - The allowed web origin for `WEB_ORIGIN`
 - The Cloudflare Tunnel name and public hostname (only after the deployment gate passes)
 
@@ -38,7 +37,6 @@ NODE_ENV="production"
 PORT=3140
 DATABASE_URL="mysql://football_draw_app:URL_ENCODED_PASSWORD@10.10.30.96:3306/football_draw_live"
 WEB_ORIGIN="https://football.siteams.com"
-ADMIN_API_KEY="A_RANDOM_SECRET_WITH_AT_LEAST_32_CHARACTERS"
 ```
 
 The MySQL password in `DATABASE_URL` must be URL encoded. Keep this file off Git.
@@ -90,7 +88,7 @@ Invoke-WebRequest http://127.0.0.1:3140/draw/admin -UseBasicParsing
 Invoke-WebRequest "http://127.0.0.1:3140/live/draw?division=SENIOR40&projector=1" -UseBasicParsing
 ```
 
-The health response must show `ok: true`, `database: ready` and `adminSecurity: ready`.
+The health response must show `ok: true` and `database: ready`.
 
 ## 5. Two-screen realtime smoke test
 
@@ -99,13 +97,14 @@ This test deliberately resets the selected division, draws one team, confirms tw
 ```powershell
 $env:BASE_URL="http://127.0.0.1:3140"
 $env:DIVISION="SENIOR40"
-$env:ADMIN_API_KEY="THE_SAME_ADMIN_API_KEY_FROM_APPS_API_ENV"
 $env:ALLOW_DRAW_SMOKE_RESET="YES_I_UNDERSTAND"
 npm run smoke:realtime
-Remove-Item Env:BASE_URL,Env:DIVISION,Env:ADMIN_API_KEY,Env:ALLOW_DRAW_SMOKE_RESET
+Remove-Item Env:BASE_URL,Env:DIVISION,Env:ALLOW_DRAW_SMOKE_RESET
 ```
 
 Also open Admin Draw and Live Draw in two separate browsers/projector outputs and confirm the reveal, progress `0–12`, group highlight, lock state and audit timeline update together.
+
+Admin write endpoints do not require an application key. When the hostname is reachable by other users, protect `/draw/admin` and write APIs with Cloudflare Access, a private network, or an equivalent upstream control.
 
 ## 6. Cloudflare gate
 

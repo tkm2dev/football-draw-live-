@@ -2,12 +2,10 @@ import {io} from 'socket.io-client'
 
 const baseUrl=process.env.BASE_URL||'http://127.0.0.1:4000'
 const division=process.env.DIVISION||'SENIOR40'
-const adminKey=process.env.ADMIN_API_KEY||''
 if(process.env.ALLOW_DRAW_SMOKE_RESET!=='YES_I_UNDERSTAND')throw new Error('Refusing to reset draw data. Set ALLOW_DRAW_SMOKE_RESET=YES_I_UNDERSTAND only on the pre-production smoke-test database.')
-if(!adminKey)throw new Error('ADMIN_API_KEY is required')
 
 const sockets=[io(baseUrl,{transports:['websocket','polling']}),io(baseUrl,{transports:['websocket','polling']})]
-const headers={'content-type':'application/json','x-admin-key':adminKey,'x-admin-user':'deployment-smoke'}
+const headers={'content-type':'application/json','x-admin-user':'deployment-smoke'}
 const waitFor=(socket,predicate)=>new Promise((resolve,reject)=>{
   const timer=setTimeout(()=>{socket.off('draw:state',listener);reject(new Error('Timed out waiting for realtime draw state'))},10_000)
   const listener=state=>{if(predicate(state)){clearTimeout(timer);socket.off('draw:state',listener);resolve(state)}}

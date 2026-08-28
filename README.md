@@ -10,7 +10,7 @@
 - 12 teams → four groups A–D → three teams per group
 - Senior rule: เพื่อนเยาวชน, ปตท.บายพาส นครพนม and Safe House always enter different groups
 - Extensible persisted rules: `SEPARATE_TEAMS`, `SEED_ACROSS_GROUPS`, `LOCK_TEAM_TO_GROUP`, `BLOCK_TEAM_FROM_GROUPS`
-- Admin Control requires `ADMIN_API_KEY` in production; the browser keeps it only for the current tab session
+- Admin Control is available without an application key; restrict the admin URL at the network or Cloudflare layer when external users can reach the deployment
 - Broadcast-style 16:9 Live Draw with team-by-team reveal, 0–12 progress, highlighted group, official lock state, audit timeline and fullscreen mode
 - Socket.IO rooms keep Admin, Live and public screens synchronized per division
 - Match generation, scores, standings and knockout state are persisted in MySQL
@@ -23,7 +23,7 @@ Vue 3, TypeScript, Pinia, Vue Router, Vite, Node.js, Express, Socket.IO, Prisma 
 
 1. Install MySQL 8 and create an empty database.
 2. `npm ci`
-3. `cp apps/api/.env.example apps/api/.env` and set `DATABASE_URL` and `ADMIN_API_KEY`.
+3. `cp apps/api/.env.example apps/api/.env` and set `DATABASE_URL`.
 4. `npm run prisma:generate`
 5. `npm run prisma:migrate`
 6. `npm run prisma:seed`

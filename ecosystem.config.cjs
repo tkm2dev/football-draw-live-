@@ -10,6 +10,6 @@ module.exports = {
     max_memory_restart: '512M',
     listen_timeout: 10000,
     kill_timeout: 10000,
-    env: {NODE_ENV: 'production', PORT: 4000}
+    env: {NODE_ENV: 'production', PORT: 3140}
   }]
 }

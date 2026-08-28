@@ -1,6 +1,6 @@
 # Production deployment — Windows VPS
 
-The API serves the built Vue app, so PM2 exposes one private origin on port `4000`. MySQL is the source of truth for draw sessions, assignments, audit events, match schedules and scores.
+The API serves the built Vue app, so PM2 exposes one private origin on port `3140`. MySQL at `10.10.30.96` is the source of truth for draw sessions, assignments, audit events, match schedules and scores. The approved public hostname is `football.siteams.com`, but its Cloudflare route remains disabled until the smoke-test gate passes.
 
 ## Required values
 
@@ -35,24 +35,24 @@ Edit `apps/api/.env` and replace every placeholder:
 
 ```dotenv
 NODE_ENV="production"
-PORT=4000
-DATABASE_URL="mysql://APP_USER:URL_ENCODED_PASSWORD@127.0.0.1:3306/football_draw_live"
-WEB_ORIGIN="https://YOUR_APPROVED_HOSTNAME"
+PORT=3140
+DATABASE_URL="mysql://football_draw_app:URL_ENCODED_PASSWORD@10.10.30.96:3306/football_draw_live"
+WEB_ORIGIN="https://football.siteams.com"
 ADMIN_API_KEY="A_RANDOM_SECRET_WITH_AT_LEAST_32_CHARACTERS"
 ```
 
 The MySQL password in `DATABASE_URL` must be URL encoded. Keep this file off Git.
 
-## 2. Create databases
+## 2. Create database on `.96`
 
 Run with an authorized MySQL account, replacing the placeholders first:
 
 ```sql
 CREATE DATABASE football_draw_live CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE DATABASE football_draw_live_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'APP_USER'@'127.0.0.1' IDENTIFIED BY 'STRONG_DATABASE_PASSWORD';
-GRANT ALL PRIVILEGES ON football_draw_live.* TO 'APP_USER'@'127.0.0.1';
-GRANT ALL PRIVILEGES ON football_draw_live_test.* TO 'APP_USER'@'127.0.0.1';
+CREATE USER 'football_draw_app'@'10.10.30.88' IDENTIFIED BY 'STRONG_DATABASE_PASSWORD';
+GRANT ALL PRIVILEGES ON football_draw_live.* TO 'football_draw_app'@'10.10.30.88';
+GRANT ALL PRIVILEGES ON football_draw_live_test.* TO 'football_draw_app'@'10.10.30.88';
 FLUSH PRIVILEGES;
 ```
 
@@ -65,7 +65,7 @@ npm run prisma:seed
 npm run check
 npm audit
 
-$env:TEST_DATABASE_URL="mysql://APP_USER:URL_ENCODED_PASSWORD@127.0.0.1:3306/football_draw_live_test"
+$env:TEST_DATABASE_URL="mysql://football_draw_app:URL_ENCODED_PASSWORD@10.10.30.96:3306/football_draw_live_test"
 npm run test:integration
 Remove-Item Env:TEST_DATABASE_URL
 ```
@@ -85,9 +85,9 @@ pm2 logs football-draw-live-api --lines 100
 Verify from the VPS before configuring a public route:
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:4000/api/health
-Invoke-WebRequest http://127.0.0.1:4000/draw/admin -UseBasicParsing
-Invoke-WebRequest "http://127.0.0.1:4000/live/draw?division=SENIOR40&projector=1" -UseBasicParsing
+Invoke-RestMethod http://127.0.0.1:3140/api/health
+Invoke-WebRequest http://127.0.0.1:3140/draw/admin -UseBasicParsing
+Invoke-WebRequest "http://127.0.0.1:3140/live/draw?division=SENIOR40&projector=1" -UseBasicParsing
 ```
 
 The health response must show `ok: true`, `database: ready` and `adminSecurity: ready`.
@@ -97,7 +97,7 @@ The health response must show `ok: true`, `database: ready` and `adminSecurity: 
 This test deliberately resets the selected division, draws one team, confirms two Socket.IO clients received the same persisted update, then resets the smoke data. Run it only before official draw data exists:
 
 ```powershell
-$env:BASE_URL="http://127.0.0.1:4000"
+$env:BASE_URL="http://127.0.0.1:3140"
 $env:DIVISION="SENIOR40"
 $env:ADMIN_API_KEY="THE_SAME_ADMIN_API_KEY_FROM_APPS_API_ENV"
 $env:ALLOW_DRAW_SMOKE_RESET="YES_I_UNDERSTAND"
@@ -116,7 +116,7 @@ cloudflared tunnel ingress validate
 cloudflared tunnel run TUNNEL_NAME
 ```
 
-The tunnel ingress service should target `http://127.0.0.1:4000`. Re-run the health check through the approved HTTPS hostname, then save/start cloudflared using the server's existing service policy.
+The `football.siteams.com` tunnel ingress service should target `http://127.0.0.1:3140`. Re-run the health check through the approved HTTPS hostname, then save/start cloudflared using the server's existing service policy.
 
 ## Rollback
 

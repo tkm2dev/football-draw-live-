@@ -27,6 +27,7 @@ onBeforeUnmount(()=>window.clearInterval(timer))
 <template>
   <div class="live-broadcast" :class="{locked:store.locked}">
     <div class="stadium-scene"><div class="floodlight left"></div><div class="floodlight right"></div><div class="pitch-lines"></div></div>
+    <div class="ambient-particles" aria-hidden="true"><i v-for="index in 18" :key="index" :style="{left:`${(index*37)%100}%`,animationDelay:`${-(index%9)*.73}s`,animationDuration:`${5+(index%5)}s`}"></i></div>
     <header class="broadcast-head">
       <div class="event-mark"><TournamentCrest/><div><small>ROYAL HONOR FOOTBALL</small><strong>PLAPAK 2026</strong></div></div>
       <div class="event-title"><span>✦ พิธีจับสลากแบ่งสาย ✦</span><h1>ฟุตบอลเฉลิมพระเกียรติ</h1><p>ครั้งที่ 13/2569 • {{store.division.name}} <b>{{store.division.subtitle}}</b></p></div>
@@ -38,7 +39,8 @@ onBeforeUnmount(()=>window.clearInterval(timer))
         <div class="reveal-kicker"><span>{{statusText}}</span><b>{{store.drawnIds.length}} / {{store.totalTeams}}</b></div>
         <Transition name="broadcast-reveal" mode="out-in">
           <div :key="store.currentReveal?.team.id||store.status" class="reveal-result">
-            <template v-if="store.currentReveal"><div class="ball-seal">⚽</div><div class="revealed-team"><small>TEAM REVEALED</small><strong>{{store.currentReveal.team.name}}</strong></div><div class="group-reveal"><small>GROUP</small><b>{{store.currentReveal.group}}</b></div></template>
+            <span v-if="store.currentReveal" class="reveal-sweep" aria-hidden="true"></span>
+            <template v-if="store.currentReveal"><div class="ball-seal">⚽<i></i></div><div class="revealed-team"><small>TEAM REVEALED</small><strong>{{store.currentReveal.team.name}}</strong></div><div class="group-reveal"><small>GROUP</small><b>{{store.currentReveal.group}}</b></div></template>
             <template v-else><div class="ball-seal standby">13</div><div class="revealed-team"><small>OFFICIAL LIVE DRAW</small><strong>กำลังรอการจับสลาก</strong></div><div class="group-reveal idle"><small>GROUP</small><b>–</b></div></template>
           </div>
         </Transition>

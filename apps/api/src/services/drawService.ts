@@ -1,4 +1,4 @@
-import {randomInt} from 'node:crypto'
+import {randomInt,randomUUID} from 'node:crypto'
 import {DrawStatus,Prisma,type DivisionType,type GroupCode as DbGroupCode} from '@prisma/client'
 import {prisma} from '../db.js'
 import {chooseNextAssignment,emptyAssignments,parseRules,GROUP_CODES,type AssignmentMap,type DivisionKey,type DrawTeam,type GroupCode} from './drawEngine.js'
@@ -8,7 +8,7 @@ export interface ApiTeam{id:string;name:string;seed:boolean}
 export interface DrawEventView{id:string;at:string;eventType:string;message:string;team?:ApiTeam;group?:GroupCode;actor?:string}
 export interface DrawState{
   sessionId:string;divisionKey:DivisionKey;groups:Record<GroupCode,ApiTeam[]>;drawnIds:string[];totalTeams:number
-  currentReveal:null|{team:ApiTeam;group:GroupCode};status:'READY'|'LIVE'|'COMPLETED'|'LOCKED';locked:boolean;events:DrawEventView[]
+  teams:ApiTeam[];separateTeamCodes:string[];currentReveal:null|{team:ApiTeam;group:GroupCode};status:'READY'|'LIVE'|'COMPLETED'|'LOCKED';locked:boolean;events:DrawEventView[]
 }
 
 type Tx=Prisma.TransactionClient
@@ -54,6 +54,8 @@ function snapshot(assignments:AssignmentMap):Prisma.InputJsonValue{
 async function stateInTransaction(tx:Tx,divisionKey:DivisionKey):Promise<DrawState>{
   const division=await divisionByType(tx,divisionKey)
   const session=await currentSession(tx,division.id)
+  const separateRule=await tx.drawRule.findFirst({where:{divisionType:division.type,ruleType:'SEPARATE_TEAMS',active:true},orderBy:{id:'desc'}})
+  const separateTeamCodes=parseRules(separateRule?[separateRule]:[]).flatMap(rule=>rule.type==='SEPARATE_TEAMS'?rule.teamCodes:[])
   const events=await tx.drawEvent.findMany({where:{drawSessionId:session.id},orderBy:[{createdAt:'desc'},{id:'desc'}],take:100,include:{team:true}})
   const groups=Object.fromEntries(GROUP_CODES.map(code=>{
     const row=division.groups.find(group=>group.code===code)
@@ -62,11 +64,46 @@ async function stateInTransaction(tx:Tx,divisionKey:DivisionKey):Promise<DrawSta
   const drawnIds=GROUP_CODES.flatMap(code=>groups[code].map(team=>team.id))
   const reveal=events.find(event=>event.eventType==='DRAW'&&event.team&&event.groupCode)
   return{
-    sessionId:String(session.id),divisionKey,groups,drawnIds,totalTeams:division.teams.length,
+    sessionId:String(session.id),divisionKey,groups,drawnIds,totalTeams:division.teams.length,teams:division.teams.map(apiTeam),separateTeamCodes,
     currentReveal:reveal?.team&&reveal.groupCode?{team:apiTeam(reveal.team),group:reveal.groupCode as GroupCode}:null,
     status:session.status,locked:session.status===DrawStatus.LOCKED,
     events:events.map(event=>({id:String(event.id),at:event.createdAt.toISOString(),eventType:event.eventType,message:event.message,team:event.team?apiTeam(event.team):undefined,group:event.groupCode as GroupCode|undefined,actor:event.actor??undefined}))
   }
+}
+
+export interface TeamConfigurationInput{code:string;name:string}
+
+export async function updateTeamConfiguration(divisionKey:DivisionKey,teams:TeamConfigurationInput[],separateTeamCodes:string[],context:AuditContext={}):Promise<DrawState>{
+  return serializable(async tx=>{
+    const division=await divisionByType(tx,divisionKey)
+    const session=await currentSession(tx,division.id)
+    await lockSession(tx,session.id)
+    const assigned=await tx.groupTeam.count({where:{group:{divisionId:division.id}}})
+    if(session.status===DrawStatus.LOCKED||assigned>0)throw new Error('แก้ไขทีมได้ก่อนเริ่มจับสลากเท่านั้น กรุณาเริ่มพิธีใหม่ก่อน')
+    if(teams.length!==division.teams.length||teams.length!==12)throw new Error('ต้องมีรายชื่อทีมครบ 12 ทีม')
+    const existingCodes=new Set(division.teams.map(team=>team.code))
+    const incomingCodes=new Set(teams.map(team=>team.code))
+    if(incomingCodes.size!==teams.length||[...incomingCodes].some(code=>!existingCodes.has(code)))throw new Error('รหัสทีมไม่ตรงกับรุ่นการแข่งขัน')
+    const normalized=teams.map(team=>({code:team.code,name:team.name.trim()}))
+    if(normalized.some(team=>!team.name||team.name.length>120))throw new Error('ชื่อทีมต้องมี 1–120 ตัวอักษร')
+    if(new Set(normalized.map(team=>team.name.toLocaleLowerCase('th-TH'))).size!==normalized.length)throw new Error('ชื่อทีมต้องไม่ซ้ำกัน')
+    if(divisionKey==='SENIOR40'){
+      if(separateTeamCodes.length!==3||new Set(separateTeamCodes).size!==3||separateTeamCodes.some(code=>!existingCodes.has(code)))throw new Error('กรุณาเลือกทีมบังคับแยกสายให้ครบ 3 ทีม')
+    }else if(separateTeamCodes.length)throw new Error('กติกาทีมบังคับใช้เฉพาะรุ่นอาวุโส')
+
+    const previousTeams=division.teams.map(team=>({code:team.code,name:team.name,seed:team.isSeed}))
+    const previousRules=await tx.drawRule.findMany({where:{divisionType:division.type,ruleType:'SEPARATE_TEAMS',active:true}})
+    for(const team of division.teams)await tx.team.update({where:{id:team.id},data:{name:`__editing_${randomUUID()}`}})
+    for(const team of normalized){
+      const row=division.teams.find(existing=>existing.code===team.code)!
+      await tx.team.update({where:{id:row.id},data:{name:team.name,isSeed:divisionKey==='SENIOR40'&&separateTeamCodes.includes(team.code)}})
+    }
+    await tx.drawRule.deleteMany({where:{divisionType:division.type,ruleType:'SEPARATE_TEAMS'}})
+    if(divisionKey==='SENIOR40')await tx.drawRule.create({data:{divisionType:division.type,ruleType:'SEPARATE_TEAMS',payload:{teamCodes:separateTeamCodes,label:'ทีมบังคับรุ่นอาวุโสต้องอยู่คนละสาย'}}})
+    await tx.drawEvent.create({data:{drawSessionId:session.id,eventType:'CONFIG',message:'แก้ไขรายชื่อทีมและกติกาบังคับ',actor:context.actor,metadata:{ip:context.ip??null,separateTeamCodes}}})
+    await audit(tx,division.id,'DIVISION',String(division.id),'UPDATE_TEAM_CONFIGURATION',context,{previousTeams,previousRuleIds:previousRules.map(rule=>rule.id),teams:normalized,separateTeamCodes})
+    return stateInTransaction(tx,divisionKey)
+  })
 }
 
 async function serializable<T>(operation:(tx:Tx)=>Promise<T>):Promise<T>{

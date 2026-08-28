@@ -21,6 +21,18 @@ integration('Prisma/MySQL draw and match persistence',()=>{
     await disconnectDb()
   })
 
+  it('updates team names and the three senior separation teams with an audit entry',async()=>{
+    const {getDrawState,updateTeamConfiguration}=await import('../drawService.js')
+    const {prisma}=await import('../../db.js')
+    const initial=await getDrawState('SENIOR40')
+    const teams=initial.teams.map(team=>({code:team.id,name:team.id==='s1'?'สมประสงค์ ยูไนเต็ด':team.name}))
+    const updated=await updateTeamConfiguration('SENIOR40',teams,['s1','s4','s9'],{actor:'integration-test'})
+    expect(updated.teams.find(team=>team.id==='s1')?.name).toBe('สมประสงค์ ยูไนเต็ด')
+    expect(updated.separateTeamCodes).toEqual(['s1','s4','s9'])
+    expect(await prisma.team.count({where:{division:{type:'SENIOR40'},isSeed:true}})).toBe(3)
+    expect(await prisma.auditLog.count({where:{action:'UPDATE_TEAM_CONFIGURATION'}})).toBe(1)
+  })
+
   it('commits assignments, session events, snapshots and audit rows atomically',async()=>{
     const {drawAll,getDrawState,resetDraw,setDrawLock}=await import('../drawService.js')
     const {prisma,disconnectDb}=await import('../../db.js')
@@ -31,6 +43,8 @@ integration('Prisma/MySQL draw and match persistence',()=>{
     expect(await prisma.groupTeam.count()).toBe(12)
     expect(await prisma.drawEvent.count({where:{eventType:'DRAW'}})).toBe(12)
     expect(await prisma.auditLog.count({where:{action:'DRAW_TEAM'}})).toBe(12)
+    const separated=Object.entries(completed.groups).filter(([,teams])=>teams.some(team=>['s1','s4','s9'].includes(team.id))).map(([group])=>group)
+    expect(new Set(separated).size).toBe(3)
     await setDrawLock('SENIOR40',true,{actor:'integration-test'})
     await disconnectDb()
     const restored=await getDrawState('SENIOR40')

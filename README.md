@@ -8,7 +8,8 @@
 - Serializable Prisma transactions plus MySQL row locks protect concurrent draw actions
 - DrawSession, DrawEvent snapshots and AuditLog preserve every draw, lock, reset and match mutation
 - 12 teams → four groups A–D → three teams per group
-- Senior rule: เพื่อนเยาวชน, ปตท.บายพาส นครพนม and Safe House always enter different groups
+- Senior rule: three admin-selected teams always enter different groups, using stable team codes so names remain editable
+- Team Management edits all 12 names and the three senior separation teams atomically with an AuditLog entry
 - Extensible persisted rules: `SEPARATE_TEAMS`, `SEED_ACROSS_GROUPS`, `LOCK_TEAM_TO_GROUP`, `BLOCK_TEAM_FROM_GROUPS`
 - Admin Control is available without an application key; restrict the admin URL at the network or Cloudflare layer when external users can reach the deployment
 - Broadcast-style 16:9 Live Draw with team-by-team reveal, 0–12 progress, highlighted group, official lock state, audit timeline and fullscreen mode

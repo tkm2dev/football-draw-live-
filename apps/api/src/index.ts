@@ -7,7 +7,7 @@ import path from 'node:path'
 import {Server} from 'socket.io'
 import {z} from 'zod'
 import {prisma,disconnectDb} from './db.js'
-import {drawAll,drawNext,getDrawState,resetDraw,setDrawLock,type AuditContext} from './services/drawService.js'
+import {drawAll,drawNext,getDrawState,resetDraw,setDrawLock,updateTeamConfiguration,type AuditContext} from './services/drawService.js'
 import {advanceKnockout,generateGroupMatches,generateKnockout,listMatches,standings,summary,updateMatch} from './services/tournamentEngine.js'
 import type {DivisionKey} from './services/drawEngine.js'
 
@@ -22,6 +22,7 @@ app.use(express.json({limit:'2mb'}))
 
 const Division=z.enum(['PUBLIC','SENIOR40'])
 const DivisionBody=z.object({divisionKey:Division})
+const TeamConfigurationBody=z.object({teams:z.array(z.object({code:z.string().min(1).max(30),name:z.string().trim().min(1).max(120)})).length(12),separateTeamCodes:z.array(z.string().min(1).max(30)).max(3)})
 const MatchPatch=z.object({homeScore:z.number().int().min(0).nullable().optional(),awayScore:z.number().int().min(0).nullable().optional(),status:z.enum(['SCHEDULED','LIVE','FINISHED']).optional(),kickoffAt:z.iso.datetime().nullable().optional(),field:z.string().max(120).optional()})
 const route=(handler:(req:Request,res:Response)=>Promise<void>)=>(req:Request,res:Response,next:NextFunction)=>handler(req,res).catch(next)
 const context=(req:Request):AuditContext=>({actor:String(req.header('x-admin-user')||'draw-admin').slice(0,120),ip:req.ip})
@@ -37,6 +38,7 @@ app.get('/api/health',route(async(_req,res)=>{
   catch{res.status(503).json({ok:false,name:'Football Draw Live API',version:'2.0.0',database:'unavailable'})}
 }))
 app.get('/api/draw/:division',route(async(req,res)=>{res.json(await getDrawState(Division.parse(req.params.division)))}))
+app.put('/api/divisions/:division/teams',route(async(req,res)=>{const key=Division.parse(req.params.division);const body=TeamConfigurationBody.parse(req.body);const state=await updateTeamConfiguration(key,body.teams,body.separateTeamCodes,context(req));await emit(key,state);res.json(state)}))
 app.post('/api/draw/reset',route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;const state=await resetDraw(key,context(req));await emit(key,state);res.json(state)}))
 app.post('/api/draw/next',route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;const state=await drawNext(key,context(req));await emit(key,state);res.json(state)}))
 app.post('/api/draw/all',route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;const state=await drawAll(key,context(req));await emit(key,state);res.json(state)}))

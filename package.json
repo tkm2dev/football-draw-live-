@@ -1,11 +1,17 @@
 {
-  "name": "football-draw-live",
-  "private": true,
-  "version": "0.1.0",
-  "workspaces": ["apps/web", "apps/api"],
-  "scripts": {
-    "dev:web": "npm --workspace apps/web run dev",
-    "dev:api": "npm --workspace apps/api run dev",
-    "build": "npm --workspace apps/web run build && npm --workspace apps/api run build"
-  }
+  "name":"football-draw-live",
+  "private":true,
+  "version":"1.0.0",
+  "workspaces":["apps/web","apps/api"],
+  "scripts":{
+    "dev:web":"npm --workspace apps/web run dev",
+    "dev:api":"npm --workspace apps/api run dev",
+    "build":"npm --workspace apps/web run build && npm --workspace apps/api run build",
+    "prisma:generate":"prisma generate",
+    "prisma:migrate":"prisma migrate deploy",
+    "prisma:seed":"tsx prisma/seed.ts"
+  },
+  "devDependencies":{"prisma":"latest","tsx":"latest"},
+  "dependencies":{"@prisma/client":"latest"},
+  "prisma":{"seed":"tsx prisma/seed.ts"}
 }

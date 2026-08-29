@@ -16,8 +16,8 @@ function complete(seed:number,extraRules:DrawRule[]=rules){
 }
 
 describe('constraint draw engine',()=>{
-  it('puts only the currently eligible head teams on the first wheel',()=>{
-    expect(eligibleNextTeams(teams,emptyAssignments(),rules).map(team=>team.code).sort()).toEqual(['s2','s4','s9'])
+  it('puts every genuinely eligible team on the first wheel without forcing constrained teams first',()=>{
+    expect(eligibleNextTeams(teams,emptyAssignments(),rules).map(team=>team.code).sort()).toEqual(teams.map(team=>team.code).sort())
   })
 
   it('draws 12 teams into four full groups and always separates the three senior seeds',()=>{

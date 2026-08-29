@@ -42,7 +42,7 @@ integration('Prisma/MySQL draw and match persistence',()=>{
     const {prisma,disconnectDb}=await import('../../db.js')
     await resetDraw('SENIOR40',{actor:'integration-test'})
     const planned=await planNextDraw('SENIOR40')
-    expect(planned.candidates.map(team=>team.id).sort()).toEqual(['s1','s4','s9'])
+    expect(planned.candidates.map(team=>team.id).sort()).toEqual(Array.from({length:12},(_,index)=>`s${index+1}`).sort())
     expect(await prisma.groupTeam.count()).toBe(0)
     const first=await commitPlannedDraw('SENIOR40',planned.plan,{actor:'integration-test'})
     expect(first.drawnIds).toHaveLength(1)

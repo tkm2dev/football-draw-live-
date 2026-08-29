@@ -101,10 +101,8 @@ export function feasibleNextChoices(teams:DrawTeam[],assignments:AssignmentMap,r
   const drawn=new Set(GROUP_CODES.flatMap(code=>assignments[code].map(team=>team.id)))
   const remaining=teams.filter(team=>!drawn.has(team.id))
   if(remaining.length===0)return[]
-  const seeded=remaining.filter(team=>team.seed)
-  const pool=seeded.length?seeded:remaining
   const choices:DrawChoice[]=[]
-  for(const team of pool){
+  for(const team of remaining){
     for(const code of validGroups(team,assignments,rules)){
       assignments[code].push(team)
       const rest=remaining.filter(candidate=>candidate.id!==team.id)

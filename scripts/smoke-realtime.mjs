@@ -6,10 +6,10 @@ if(process.env.ALLOW_DRAW_SMOKE_RESET!=='YES_I_UNDERSTAND')throw new Error('Refu
 
 const sockets=[io(baseUrl,{transports:['websocket','polling']}),io(baseUrl,{transports:['websocket','polling']})]
 const headers={'content-type':'application/json','x-admin-user':'deployment-smoke'}
-const waitFor=(socket,predicate)=>new Promise((resolve,reject)=>{
-  const timer=setTimeout(()=>{socket.off('draw:state',listener);reject(new Error('Timed out waiting for realtime draw state'))},10_000)
-  const listener=state=>{if(predicate(state)){clearTimeout(timer);socket.off('draw:state',listener);resolve(state)}}
-  socket.on('draw:state',listener)
+const waitFor=(socket,event,predicate)=>new Promise((resolve,reject)=>{
+  const timer=setTimeout(()=>{socket.off(event,listener);reject(new Error(`Timed out waiting for ${event}`))},12_000)
+  const listener=value=>{if(predicate(value)){clearTimeout(timer);socket.off(event,listener);resolve(value)}}
+  socket.on(event,listener)
 })
 const post=async(path,body)=>{
   const response=await fetch(`${baseUrl}${path}`,{method:'POST',headers,body:JSON.stringify(body)})
@@ -21,16 +21,24 @@ const post=async(path,body)=>{
 try{
   await Promise.all(sockets.map(socket=>new Promise((resolve,reject)=>{socket.once('connect',resolve);socket.once('connect_error',reject)})))
   sockets.forEach(socket=>socket.emit('watch:division',division))
-  const ready=sockets.map(socket=>waitFor(socket,state=>state.divisionKey===division&&state.drawnIds.length===0))
+  const ready=sockets.map(socket=>waitFor(socket,'draw:state',state=>state.divisionKey===division&&state.drawnIds.length===0))
   await post('/api/draw/reset',{divisionKey:division})
   await Promise.all(ready)
-  const updated=sockets.map(socket=>waitFor(socket,state=>state.divisionKey===division&&state.drawnIds.length===1))
-  await post('/api/draw/next',{divisionKey:division})
+  const spinning=sockets.map(socket=>waitFor(socket,'draw:spinning',event=>event.divisionKey===division&&event.teams.length===12&&event.durationMs>=4_000))
+  const updated=sockets.map(socket=>waitFor(socket,'draw:state',state=>state.divisionKey===division&&state.drawnIds.length===1))
+  const startedAt=Date.now()
+  const drawRequest=post('/api/draw/next',{divisionKey:division})
+  await Promise.all(spinning)
+  await new Promise(resolve=>setTimeout(resolve,600))
+  const duringSpin=await(await fetch(`${baseUrl}/api/draw/${division}`)).json()
+  if(duringSpin.drawnIds.length!==0)throw new Error('The result was persisted before the wheel stopped')
+  await drawRequest
+  if(Date.now()-startedAt<4_000)throw new Error('The draw completed before the ceremony wheel duration')
   await Promise.all(updated)
   const persisted=await(await fetch(`${baseUrl}/api/draw/${division}`)).json()
   if(persisted.drawnIds.length!==1)throw new Error('The draw update was not persisted')
   await post('/api/draw/reset',{divisionKey:division})
-  console.log('PASS: two realtime clients received the persisted admin draw update; smoke data was reset')
+  console.log('PASS: two clients saw the wheel before one persisted reveal; smoke data was reset')
 }finally{
   sockets.forEach(socket=>socket.close())
 }

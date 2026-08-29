@@ -8,7 +8,7 @@ export type Standing={team:ApiTeam;p:number;w:number;d:number;l:number;gf:number
 type Tx=Prisma.TransactionClient
 type MatchRow=Prisma.MatchGetPayload<{include:{home:true,away:true}}>
 
-const apiTeam=(team:{code:string;name:string;isSeed:boolean}):ApiTeam=>({id:team.code,name:team.name,seed:team.isSeed})
+const apiTeam=(team:{code:string;name:string;isSeed:boolean;logoUrl:string|null}):ApiTeam=>({id:team.code,name:team.name,seed:team.isSeed,logoUrl:team.logoUrl??undefined})
 const matchView=(divisionKey:DivisionKey,row:MatchRow):Match=>({id:String(row.id),divisionKey,stage:row.stage,group:row.groupCode as GroupCode|undefined,round:row.round,home:apiTeam(row.home),away:apiTeam(row.away),homeScore:row.homeScore,awayScore:row.awayScore,status:row.status,kickoffAt:row.kickoffAt?.toISOString()??null,field:row.field??'สนามกลาง'})
 
 async function division(tx:Tx,key:DivisionKey){
@@ -52,6 +52,8 @@ export async function generateGroupMatches(key:DivisionKey,context:AuditContext=
     const session=await tx.drawSession.findFirst({where:{divisionId:div.id},orderBy:{id:'desc'}})
     if(session?.status!==DrawStatus.LOCKED)throw new Error('กรุณาจับครบและล็อกผลอย่างเป็นทางการก่อนสร้างโปรแกรมแข่งขัน')
     for(const group of div.groups)if(group.teams.length!==3)throw new Error(`สาย ${group.code} ยังมีทีมไม่ครบ 3 ทีม`)
+    const existing=await matchRows(tx,div.id)
+    if(existing.some(match=>match.status!==MatchStatus.SCHEDULED||match.homeScore!==null||match.awayScore!==null))throw new Error('มีผลการแข่งขันแล้ว ไม่สามารถสร้างโปรแกรมทับได้')
     await tx.match.deleteMany({where:{divisionId:div.id}})
     const pairs:[[number,number],[number,number],[number,number]]=[[0,1],[2,0],[1,2]]
     for(const group of div.groups)for(const [index,pair] of pairs.entries())await tx.match.create({data:{divisionId:div.id,stage:MatchStage.GROUP,groupCode:group.code,round:index+1,homeTeamId:group.teams[pair[0]].teamId,awayTeamId:group.teams[pair[1]].teamId,status:MatchStatus.SCHEDULED,field:'สนามกลาง'}})
@@ -63,6 +65,49 @@ export async function generateGroupMatches(key:DivisionKey,context:AuditContext=
 export async function listMatches(key:DivisionKey):Promise<Match[]>{
   const div=await division(prisma,key)
   return(await matchRows(prisma,div.id)).map(row=>matchView(key,row))
+}
+
+export interface MatchScheduleInput{id:string;homeTeamCode:string;awayTeamCode:string;kickoffAt:string|null;field:string}
+export async function updateMatchSchedule(key:DivisionKey,inputs:MatchScheduleInput[],context:AuditContext={}):Promise<Match[]>{
+  return prisma.$transaction(async tx=>{
+    const div=await division(tx,key)
+    await tx.$queryRaw`SELECT id FROM Division WHERE id = ${div.id} FOR UPDATE`
+    const ids=inputs.map(input=>Number(input.id))
+    if(ids.some(id=>!Number.isInteger(id))||new Set(ids).size!==ids.length)throw new Error('รายการแข่งขันซ้ำหรือรหัสไม่ถูกต้อง')
+    const rows=await matchRows(tx,div.id)
+    const rowById=new Map(rows.map(row=>[row.id,row]))
+    const teamByCode=new Map(div.teams.map(team=>[team.code,team]))
+    const changes=new Map<number,{homeTeamId:number;awayTeamId:number;kickoffAt:Date|null;field:string|null}>()
+    for(const input of inputs){
+      const id=Number(input.id),row=rowById.get(id)
+      if(!row)throw new Error(`ไม่พบการแข่งขัน ${input.id}`)
+      const home=teamByCode.get(input.homeTeamCode),away=teamByCode.get(input.awayTeamCode)
+      if(!home||!away)throw new Error('ทีมแข่งขันไม่อยู่ในรุ่นนี้')
+      if(home.id===away.id)throw new Error('ทีมเหย้าและทีมเยือนต้องเป็นคนละทีม')
+      if((home.id!==row.homeTeamId||away.id!==row.awayTeamId)&&(row.status!==MatchStatus.SCHEDULED||row.homeScore!==null||row.awayScore!==null))throw new Error('ไม่สามารถเปลี่ยนคู่แข่งขันของนัดที่เริ่มแข่งขันหรือมีผลแล้ว')
+      if(row.stage===MatchStage.GROUP){
+        const group=div.groups.find(item=>item.code===row.groupCode)
+        const members=new Set(group?.teams.map(entry=>entry.teamId)??[])
+        if(!members.has(home.id)||!members.has(away.id))throw new Error(`คู่แข่งขันนัดสาย ${row.groupCode} ต้องเลือกจากทีมในสายเดียวกัน`)
+      }
+      const kickoffAt=input.kickoffAt?new Date(input.kickoffAt):null
+      if(kickoffAt&&Number.isNaN(kickoffAt.getTime()))throw new Error('วันเวลาแข่งขันไม่ถูกต้อง')
+      changes.set(id,{homeTeamId:home.id,awayTeamId:away.id,kickoffAt,field:input.field.trim()||null})
+    }
+    const planned=rows.map(row=>({id:row.id,stage:row.stage,groupCode:row.groupCode,homeTeamId:changes.get(row.id)?.homeTeamId??row.homeTeamId,awayTeamId:changes.get(row.id)?.awayTeamId??row.awayTeamId}))
+    for(const code of GROUP_CODES){
+      const matches=planned.filter(row=>row.stage===MatchStage.GROUP&&row.groupCode===code)
+      if(!matches.length)continue
+      if(matches.length!==3)throw new Error(`โปรแกรมสาย ${code} ต้องมี 3 นัด`)
+      const pairs=new Set(matches.map(match=>[match.homeTeamId,match.awayTeamId].sort((a,b)=>a-b).join(':')))
+      const appearances=new Map<number,number>()
+      for(const match of matches){appearances.set(match.homeTeamId,(appearances.get(match.homeTeamId)??0)+1);appearances.set(match.awayTeamId,(appearances.get(match.awayTeamId)??0)+1)}
+      if(pairs.size!==3||[...appearances.values()].some(count=>count!==2)||appearances.size!==3)throw new Error(`โปรแกรมสาย ${code} ต้องพบกันครบทุกคู่และห้ามมีคู่ซ้ำ`)
+    }
+    for(const [id,data] of changes)await tx.match.update({where:{id},data})
+    await audit(tx,div.id,'MATCH_SCHEDULE',String(div.id),'UPDATE_MATCH_SCHEDULE',context,{matchIds:ids,count:ids.length})
+    return(await matchRows(tx,div.id)).map(row=>matchView(key,row))
+  },{isolationLevel:Prisma.TransactionIsolationLevel.Serializable})
 }
 
 export interface MatchPatch{homeScore?:number|null;awayScore?:number|null;status?:'SCHEDULED'|'LIVE'|'FINISHED';kickoffAt?:string|null;field?:string}
@@ -82,6 +127,8 @@ export async function updateMatch(key:DivisionKey,id:string,patch:MatchPatch,con
     if('field'in patch)data.field=patch.field?.trim()||null
     const nextHome='homeScore'in patch?patch.homeScore:existing.homeScore
     const nextAway='awayScore'in patch?patch.awayScore:existing.awayScore
+    const nextStatus=patch.status??(nextHome!==null&&nextHome!==undefined&&nextAway!==null&&nextAway!==undefined?'FINISHED':existing.status)
+    if(nextStatus==='FINISHED'&&(nextHome===null||nextHome===undefined||nextAway===null||nextAway===undefined))throw new Error('กรุณากรอกสกอร์ทั้งสองทีมก่อนยืนยันผลการแข่งขัน')
     if(!patch.status&&nextHome!==null&&nextHome!==undefined&&nextAway!==null&&nextAway!==undefined)data.status=MatchStatus.FINISHED
     const updated=await tx.match.update({where:{id:numericId},data,include:{home:true,away:true}})
     await audit(tx,div.id,'MATCH',id,'UPDATE',context,JSON.parse(JSON.stringify(patch)) as Prisma.InputJsonValue)

@@ -42,7 +42,9 @@ export const useTournamentStore=defineStore('tournament',{
     async drawAll(){this.applyState(await this.post('/api/draw/all',{divisionKey:this.divisionKey}))},
     async toggleLock(){this.applyState(await this.post('/api/draw/lock',{divisionKey:this.divisionKey,locked:!this.locked}))},
     async generateMatches(){this.matches=await this.post('/api/matches/generate',{divisionKey:this.divisionKey});await this.loadTournament()},
-    async saveScore(match:Match){await json(await fetch(`${api}/api/matches/${this.divisionKey}/${match.id}`,{method:'PATCH',headers:writeHeaders,body:JSON.stringify({homeScore:match.homeScore,awayScore:match.awayScore,status:'FINISHED',kickoffAt:match.kickoffAt||null,field:match.field})}));await this.loadTournament()},
+    async saveSchedule(matches:Array<{id:string;homeTeamCode:string;awayTeamCode:string;kickoffAt:string|null;field:string}>){this.matches=await json(await fetch(`${api}/api/matches/${this.divisionKey}/schedule`,{method:'PUT',headers:writeHeaders,body:JSON.stringify({matches})}));await this.loadTournament()},
+    async saveMatchResult(id:string,homeScore:number|null,awayScore:number|null,status:Match['status']){await json(await fetch(`${api}/api/matches/${this.divisionKey}/${id}`,{method:'PATCH',headers:writeHeaders,body:JSON.stringify({homeScore,awayScore,status})}));await this.loadTournament()},
+    async saveScore(match:Match){await this.saveMatchResult(match.id,match.homeScore,match.awayScore,'FINISHED')},
     async generateKnockout(){await this.post('/api/knockout/generate',{divisionKey:this.divisionKey});await this.loadTournament()},
     async advanceKnockout(){await this.post('/api/knockout/advance',{divisionKey:this.divisionKey});await this.loadTournament()}
   }

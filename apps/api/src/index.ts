@@ -11,7 +11,7 @@ import {Server} from 'socket.io'
 import {z} from 'zod'
 import {prisma,disconnectDb} from './db.js'
 import {commitPlannedDraw,drawAll,getDrawState,planNextDraw,resetDraw,setDrawLock,updateTeamConfiguration,updateTeamLogo,type AuditContext} from './services/drawService.js'
-import {advanceKnockout,generateGroupMatches,generateKnockout,listMatches,standings,summary,updateMatch} from './services/tournamentEngine.js'
+import {advanceKnockout,generateGroupMatches,generateKnockout,listMatches,standings,summary,updateMatch,updateMatchSchedule} from './services/tournamentEngine.js'
 import type {DivisionKey} from './services/drawEngine.js'
 import {logoExtension,MAX_LOGO_BYTES,storedLogoPath} from './uploads.js'
 
@@ -34,6 +34,7 @@ const spinningDivisions=new Set<DivisionKey>()
 const DivisionBody=z.object({divisionKey:Division})
 const TeamConfigurationBody=z.object({teams:z.array(z.object({code:z.string().min(1).max(30),name:z.string().trim().min(1).max(120)})).length(12),separateTeamCodes:z.array(z.string().min(1).max(30)).max(3)})
 const MatchPatch=z.object({homeScore:z.number().int().min(0).nullable().optional(),awayScore:z.number().int().min(0).nullable().optional(),status:z.enum(['SCHEDULED','LIVE','FINISHED']).optional(),kickoffAt:z.iso.datetime().nullable().optional(),field:z.string().max(120).optional()})
+const MatchScheduleBody=z.object({matches:z.array(z.object({id:z.string().regex(/^\d+$/),homeTeamCode:z.string().min(1).max(30),awayTeamCode:z.string().min(1).max(30),kickoffAt:z.iso.datetime().nullable(),field:z.string().max(120)})).min(1).max(64)})
 const route=(handler:(req:Request,res:Response)=>Promise<void>)=>(req:Request,res:Response,next:NextFunction)=>handler(req,res).catch(next)
 const context=(req:Request):AuditContext=>({actor:String(req.header('x-admin-user')||'draw-admin').slice(0,120),ip:req.ip})
 const ensureNotSpinning=(key:DivisionKey)=>{if(spinningDivisions.has(key))throw new Error('กรุณารอวงล้อหยุดก่อนทำรายการถัดไป')}
@@ -96,6 +97,7 @@ app.post('/api/draw/lock',route(async(req,res)=>{const body=DivisionBody.extend(
 app.get('/api/tournament/:division',route(async(req,res)=>{res.json(await summary(Division.parse(req.params.division)))}))
 app.post('/api/matches/generate',route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;const out=await generateGroupMatches(key,context(req));await emit(key);res.json(out)}))
 app.get('/api/matches/:division',route(async(req,res)=>{res.json(await listMatches(Division.parse(req.params.division)))}))
+app.put('/api/matches/:division/schedule',route(async(req,res)=>{const key=Division.parse(req.params.division);const body=MatchScheduleBody.parse(req.body);const out=await updateMatchSchedule(key,body.matches,context(req));await emit(key);res.json(out)}))
 app.patch('/api/matches/:division/:id',route(async(req,res)=>{const key=Division.parse(req.params.division);const match=await updateMatch(key,z.string().parse(req.params.id),MatchPatch.parse(req.body),context(req));await emit(key);res.json(match)}))
 app.get('/api/standings/:division',route(async(req,res)=>{res.json(await standings(Division.parse(req.params.division)))}))
 app.post('/api/knockout/generate',route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;const out=await generateKnockout(key,context(req));await emit(key);res.json(out)}))

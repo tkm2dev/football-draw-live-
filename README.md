@@ -15,7 +15,7 @@
 - Admin Control is available without an application key; restrict the admin URL at the network or Cloudflare layer when external users can reach the deployment
 - Broadcast-style 16:9 Live Draw with a server-synchronised team wheel, team-by-team reveal, 0–12 progress, highlighted group, official result state, audit timeline and fullscreen mode
 - Socket.IO rooms keep Admin, Live and public screens synchronized per division
-- Match generation, scores, standings and knockout state are persisted in MySQL
+- Match Operations manages pairings, dates, kickoff times, fields, live/final scores and team logos; schedules, standings and knockout state are persisted in MySQL with audit entries
 
 ## Stack
 

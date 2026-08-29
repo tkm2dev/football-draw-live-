@@ -84,6 +84,11 @@ app.post('/api/draw/next',route(async(req,res)=>{
     const state=await commitPlannedDraw(key,plan,context(req))
     await emit(key,state)
     res.json(state)
+  }catch(error){
+    // Releasing the live clients from the wheel is best-effort; preserve the
+    // original planning/commit error for the control screen.
+    await getDrawState(key).then(state=>emit(key,state)).catch(()=>undefined)
+    throw error
   }finally{spinningDivisions.delete(key)}
 }))
 app.post('/api/draw/all',route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;ensureNotSpinning(key);const state=await drawAll(key,context(req));await emit(key,state);res.json(state)}))

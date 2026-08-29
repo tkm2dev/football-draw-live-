@@ -96,21 +96,41 @@ export function assertDrawConfiguration(teams:DrawTeam[],assignments:AssignmentM
   }
 }
 
-export function chooseNextAssignment(teams:DrawTeam[],assignments:AssignmentMap,rules:DrawRule[],random:RandomSource=Math.random):DrawChoice|null{
+export function feasibleNextChoices(teams:DrawTeam[],assignments:AssignmentMap,rules:DrawRule[]):DrawChoice[]{
   assertDrawConfiguration(teams,assignments,rules)
   const drawn=new Set(GROUP_CODES.flatMap(code=>assignments[code].map(team=>team.id)))
   const remaining=teams.filter(team=>!drawn.has(team.id))
-  if(remaining.length===0)return null
+  if(remaining.length===0)return[]
   const seeded=remaining.filter(team=>team.seed)
   const pool=seeded.length?seeded:remaining
-  for(const team of shuffled(pool,random)){
-    for(const code of shuffled(validGroups(team,assignments,rules),random)){
+  const choices:DrawChoice[]=[]
+  for(const team of pool){
+    for(const code of validGroups(team,assignments,rules)){
       assignments[code].push(team)
       const rest=remaining.filter(candidate=>candidate.id!==team.id)
-      const possible=canComplete(rest,assignments,rules,random)
+      const possible=canComplete(rest,assignments,rules,()=>.5)
       assignments[code].pop()
-      if(possible)return{team,group:code}
+      if(possible)choices.push({team,group:code})
     }
   }
-  throw new Error('ไม่พบรูปแบบการจัดสายที่ผ่านเงื่อนไข กรุณาตรวจสอบกติกา ทีมวาง และทีมที่ล็อกไว้')
+  return choices
+}
+
+export function eligibleNextTeams(teams:DrawTeam[],assignments:AssignmentMap,rules:DrawRule[]):DrawTeam[]{
+  const choices=feasibleNextChoices(teams,assignments,rules)
+  return choices.filter((choice,index)=>choices.findIndex(candidate=>candidate.team.id===choice.team.id)===index).map(choice=>choice.team)
+}
+
+export function chooseNextAssignment(teams:DrawTeam[],assignments:AssignmentMap,rules:DrawRule[],random:RandomSource=Math.random):DrawChoice|null{
+  const choices=feasibleNextChoices(teams,assignments,rules)
+  if(!choices.length){
+    const drawn=GROUP_CODES.reduce((total,code)=>total+assignments[code].length,0)
+    if(drawn===teams.length)return null
+    throw new Error('ไม่พบรูปแบบการจัดสายที่ผ่านเงื่อนไข กรุณาตรวจสอบกติกา ทีมวาง และทีมที่ล็อกไว้')
+  }
+  const teamsInWheel=choices.filter((choice,index)=>choices.findIndex(candidate=>candidate.team.id===choice.team.id)===index).map(choice=>choice.team)
+  const team=shuffled(teamsInWheel,random)[0]
+  const groups=choices.filter(choice=>choice.team.id===team.id).map(choice=>choice.group)
+  const group=shuffled(groups,random)[0]
+  return{team,group}
 }

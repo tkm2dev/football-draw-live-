@@ -1,7 +1,7 @@
 import {randomInt,randomUUID} from 'node:crypto'
 import {DrawStatus,Prisma,type DivisionType,type GroupCode as DbGroupCode} from '@prisma/client'
 import {prisma} from '../db.js'
-import {chooseNextAssignment,emptyAssignments,parseRules,GROUP_CODES,type AssignmentMap,type DivisionKey,type DrawTeam,type GroupCode} from './drawEngine.js'
+import {chooseNextAssignment,eligibleNextTeams,feasibleNextChoices,emptyAssignments,parseRules,GROUP_CODES,type AssignmentMap,type DivisionKey,type DrawTeam,type GroupCode} from './drawEngine.js'
 
 export interface AuditContext{actor?:string;ip?:string}
 export interface ApiTeam{id:string;name:string;seed:boolean;logoUrl?:string}
@@ -141,6 +141,50 @@ async function serializable<T>(operation:(tx:Tx)=>Promise<T>):Promise<T>{
 
 export async function getDrawState(divisionKey:DivisionKey):Promise<DrawState>{
   return prisma.$transaction(tx=>stateInTransaction(tx,divisionKey))
+}
+
+export interface PlannedDraw{sessionId:number;drawOrder:number;teamCode:string;group:GroupCode}
+
+export async function planNextDraw(divisionKey:DivisionKey):Promise<{plan:PlannedDraw;candidates:ApiTeam[]}>{
+  return serializable(async tx=>{
+    const division=await divisionByType(tx,divisionKey)
+    const session=await currentSession(tx,division.id)
+    await lockSession(tx,session.id)
+    if(session.status===DrawStatus.LOCKED)throw new Error('การจับสลากถูกล็อกแล้ว')
+    const ruleRows=await tx.drawRule.findMany({where:{divisionType:division.type,active:true},orderBy:{id:'asc'}})
+    const rules=parseRules(ruleRows)
+    const teams=division.teams.map(domainTeam)
+    const assignments=assignmentMap(division)
+    const choice=chooseNextAssignment(teams,assignments,rules,dbRandom)
+    if(!choice)throw new Error('กรุณาตรวจสอบ ผลการจับสลากครบทุกทีมแล้ว')
+    const eligibleIds=new Set(eligibleNextTeams(teams,assignments,rules).map(team=>team.id))
+    const candidates=division.teams.filter(team=>eligibleIds.has(team.id)).map(apiTeam)
+    const drawOrder=GROUP_CODES.reduce((total,code)=>total+assignments[code].length,0)+1
+    return{plan:{sessionId:session.id,drawOrder,teamCode:choice.team.code,group:choice.group},candidates}
+  })
+}
+
+export async function commitPlannedDraw(divisionKey:DivisionKey,plan:PlannedDraw,context:AuditContext={}):Promise<DrawState>{
+  return serializable(async tx=>{
+    const division=await divisionByType(tx,divisionKey)
+    const session=await currentSession(tx,division.id)
+    await lockSession(tx,session.id)
+    if(session.status===DrawStatus.LOCKED)throw new Error('การจับสลากถูกล็อกแล้ว')
+    if(session.id!==plan.sessionId)throw new Error('สถานะการจับสลากเปลี่ยนไป กรุณาหมุนวงล้อใหม่')
+    const ruleRows=await tx.drawRule.findMany({where:{divisionType:division.type,active:true},orderBy:{id:'asc'}})
+    const rules=parseRules(ruleRows)
+    const teams=division.teams.map(domainTeam)
+    const assignments=assignmentMap(division)
+    const drawn=GROUP_CODES.reduce((total,code)=>total+assignments[code].length,0)
+    if(drawn+1!==plan.drawOrder)throw new Error('สถานะการจับสลากเปลี่ยนไป กรุณาหมุนวงล้อใหม่')
+    const choice=feasibleNextChoices(teams,assignments,rules).find(candidate=>candidate.team.code===plan.teamCode&&candidate.group===plan.group)
+    if(!choice)throw new Error('ผลที่วงล้อเลือกไม่ผ่านเงื่อนไข กรุณาหมุนวงล้อใหม่')
+    await persistChoice(tx,division,session.id,choice,plan.drawOrder,context)
+    assignments[choice.group].push(choice.team)
+    const completed=plan.drawOrder===teams.length
+    await tx.drawSession.update({where:{id:session.id},data:{status:completed?DrawStatus.COMPLETED:DrawStatus.LIVE,startedAt:session.startedAt??new Date(),completedAt:completed?(session.completedAt??new Date()):null,snapshot:snapshot(assignments)}})
+    return stateInTransaction(tx,divisionKey)
+  })
 }
 
 async function persistChoice(tx:Tx,division:Awaited<ReturnType<typeof divisionByType>>,sessionId:number,choice:{team:DrawTeam;group:GroupCode},drawOrder:number,context:AuditContext){

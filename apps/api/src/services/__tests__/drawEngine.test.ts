@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest'
-import {chooseNextAssignment,emptyAssignments,parseRules,type DrawRule,type DrawTeam} from '../drawEngine.js'
+import {chooseNextAssignment,eligibleNextTeams,emptyAssignments,parseRules,type DrawRule,type DrawTeam} from '../drawEngine.js'
 
 const teams:DrawTeam[]=Array.from({length:12},(_,index)=>({id:index+1,code:`s${index+1}`,name:`Team ${index+1}`,seed:[1,3,8].includes(index),}))
 const rules:DrawRule[]=[{type:'SEPARATE_TEAMS',teamCodes:['s2','s4','s9']}]
@@ -16,6 +16,10 @@ function complete(seed:number,extraRules:DrawRule[]=rules){
 }
 
 describe('constraint draw engine',()=>{
+  it('puts only the currently eligible head teams on the first wheel',()=>{
+    expect(eligibleNextTeams(teams,emptyAssignments(),rules).map(team=>team.code).sort()).toEqual(['s2','s4','s9'])
+  })
+
   it('draws 12 teams into four full groups and always separates the three senior seeds',()=>{
     for(let seed=1;seed<=100;seed++){
       const groups=complete(seed)

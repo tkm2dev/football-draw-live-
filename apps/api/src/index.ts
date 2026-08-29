@@ -10,7 +10,7 @@ import multer,{MulterError} from 'multer'
 import {Server} from 'socket.io'
 import {z} from 'zod'
 import {prisma,disconnectDb} from './db.js'
-import {drawAll,drawNext,getDrawState,resetDraw,setDrawLock,updateTeamConfiguration,updateTeamLogo,type AuditContext} from './services/drawService.js'
+import {commitPlannedDraw,drawAll,getDrawState,planNextDraw,resetDraw,setDrawLock,updateTeamConfiguration,updateTeamLogo,type AuditContext} from './services/drawService.js'
 import {advanceKnockout,generateGroupMatches,generateKnockout,listMatches,standings,summary,updateMatch} from './services/tournamentEngine.js'
 import type {DivisionKey} from './services/drawEngine.js'
 import {logoExtension,MAX_LOGO_BYTES,storedLogoPath} from './uploads.js'
@@ -28,7 +28,8 @@ const logoUpload=multer({storage:multer.memoryStorage(),limits:{fileSize:MAX_LOG
 app.use('/uploads',express.static(uploadRoot,{dotfiles:'deny',fallthrough:true,maxAge:'30d',immutable:true}))
 
 const Division=z.enum(['PUBLIC','SENIOR40'])
-const DRAW_SPIN_MS=4200
+const DRAW_SPIN_MS=2600
+const DRAW_SETTLE_MS=1800
 const spinningDivisions=new Set<DivisionKey>()
 const DivisionBody=z.object({divisionKey:Division})
 const TeamConfigurationBody=z.object({teams:z.array(z.object({code:z.string().min(1).max(30),name:z.string().trim().min(1).max(120)})).length(12),separateTeamCodes:z.array(z.string().min(1).max(30)).max(3)})
@@ -73,15 +74,14 @@ app.post('/api/draw/reset',route(async(req,res)=>{const key=DivisionBody.parse(r
 app.post('/api/draw/next',route(async(req,res)=>{
   const key=DivisionBody.parse(req.body).divisionKey
   ensureNotSpinning(key)
-  const before=await getDrawState(key)
-  if(before.locked)throw new Error('การจับสลากถูกล็อกแล้ว')
-  const candidates=before.teams.filter(team=>!before.drawnIds.includes(team.id))
-  if(!candidates.length)throw new Error('กรุณาตรวจสอบ ผลการจับสลากครบทุกทีมแล้ว')
   spinningDivisions.add(key)
   try{
-    io.to(`division:${key}`).emit('draw:spinning',{divisionKey:key,teams:candidates,durationMs:DRAW_SPIN_MS,startedAt:new Date().toISOString()})
+    const {plan,candidates}=await planNextDraw(key)
+    io.to(`division:${key}`).emit('draw:spinning',{divisionKey:key,teams:candidates,durationMs:DRAW_SPIN_MS,settleDurationMs:DRAW_SETTLE_MS,startedAt:new Date().toISOString()})
     await new Promise(resolve=>setTimeout(resolve,DRAW_SPIN_MS))
-    const state=await drawNext(key,context(req))
+    io.to(`division:${key}`).emit('draw:settling',{divisionKey:key,targetTeamId:plan.teamCode,durationMs:DRAW_SETTLE_MS})
+    await new Promise(resolve=>setTimeout(resolve,DRAW_SETTLE_MS))
+    const state=await commitPlannedDraw(key,plan,context(req))
     await emit(key,state)
     res.json(state)
   }finally{spinningDivisions.delete(key)}

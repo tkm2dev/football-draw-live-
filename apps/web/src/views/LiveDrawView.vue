@@ -39,7 +39,7 @@ onBeforeUnmount(()=>window.clearInterval(timer))
       <section class="reveal-stage">
         <div class="reveal-kicker"><span>{{statusText}}</span><b>{{store.drawnIds.length}} / {{store.totalTeams}}</b></div>
         <Transition name="broadcast-reveal" mode="out-in">
-          <DrawWheel v-if="store.spinActive" key="wheel" :teams="store.spinTeams" :duration-ms="store.spinDurationMs"/>
+          <DrawWheel v-if="store.spinActive" key="wheel" :teams="store.spinTeams" :target-team-id="store.spinTargetTeamId" :settle-duration-ms="store.spinSettleDurationMs"/>
           <div v-else :key="store.currentReveal?.team.id||store.status" class="reveal-result">
             <span v-if="store.currentReveal" class="reveal-sweep" aria-hidden="true"></span>
             <template v-if="store.currentReveal"><div class="ball-seal" :class="{'has-team-logo':store.currentReveal.team.logoUrl}"><img v-if="store.currentReveal.team.logoUrl" :src="store.currentReveal.team.logoUrl" :alt="`โลโก้ ${store.currentReveal.team.name}`"><template v-else>⚽</template><i></i></div><div class="revealed-team"><small>TEAM REVEALED</small><strong>{{store.currentReveal.team.name}}</strong></div><div class="group-reveal"><small>GROUP</small><b>{{store.currentReveal.group}}</b></div></template>

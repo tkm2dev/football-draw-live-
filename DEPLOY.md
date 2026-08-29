@@ -89,7 +89,7 @@ Verify from the VPS before configuring a public route:
 ```powershell
 Invoke-RestMethod http://127.0.0.1:3140/api/health
 Invoke-WebRequest http://127.0.0.1:3140/draw/admin -UseBasicParsing
-Invoke-WebRequest "http://127.0.0.1:3140/live/draw?division=SENIOR40&projector=1" -UseBasicParsing
+Invoke-WebRequest "http://127.0.0.1:3140/live/draw?projector=1" -UseBasicParsing
 ```
 
 The health response must show `ok: true` and `database: ready`.

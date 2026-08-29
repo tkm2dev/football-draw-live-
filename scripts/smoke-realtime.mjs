@@ -20,6 +20,9 @@ const post=async(path,body)=>{
 
 try{
   await Promise.all(sockets.map(socket=>new Promise((resolve,reject)=>{socket.once('connect',resolve);socket.once('connect_error',reject)})))
+  const combinedStates=['PUBLIC','SENIOR40'].map(key=>waitFor(sockets[0],'draw:state',state=>state.divisionKey===key))
+  sockets[0].emit('watch:divisions',['PUBLIC','SENIOR40'])
+  await Promise.all(combinedStates)
   sockets.forEach(socket=>socket.emit('watch:division',division))
   const ready=sockets.map(socket=>waitFor(socket,'draw:state',state=>state.divisionKey===division&&state.drawnIds.length===0))
   await post('/api/draw/reset',{divisionKey:division})

@@ -102,15 +102,19 @@ app.post('/api/knockout/generate',route(async(req,res)=>{const key=DivisionBody.
 app.post('/api/knockout/advance',route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;const out=await advanceKnockout(key,context(req));await emit(key);res.json(out)}))
 
 io.on('connection',socket=>{
-  const watch=async(value:unknown)=>{
-    const key=Division.parse(value)
+  const watchMany=async(value:unknown)=>{
+    const keys=[...new Set(z.array(Division).min(1).max(2).parse(value))]
     for(const room of socket.rooms)if(room.startsWith('division:'))socket.leave(room)
-    socket.join(`division:${key}`)
-    socket.emit('draw:state',await getDrawState(key))
-    socket.emit('tournament:update',await summary(key))
+    for(const key of keys){
+      socket.join(`division:${key}`)
+      socket.emit('draw:state',await getDrawState(key))
+      socket.emit('tournament:update',await summary(key))
+    }
   }
-  socket.on('watch:division',(value:unknown)=>watch(value).catch(error=>socket.emit('server:error',{message:error instanceof Error?error.message:'เกิดข้อผิดพลาด'})))
-  watch('SENIOR40').catch(()=>undefined)
+  const report=(error:unknown)=>socket.emit('server:error',{message:error instanceof Error?error.message:'เกิดข้อผิดพลาด'})
+  socket.on('watch:division',(value:unknown)=>watchMany([value]).catch(report))
+  socket.on('watch:divisions',(value:unknown)=>watchMany(value).catch(report))
+  watchMany(['SENIOR40']).catch(()=>undefined)
 })
 
 const webDist=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../web/dist')

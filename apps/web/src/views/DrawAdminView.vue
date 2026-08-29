@@ -14,7 +14,7 @@ const editingTeams=ref(false)
 const teamDraft=ref<Array<{code:string;name:string;logoUrl?:string;separate:boolean}>>([])
 const uploadingCode=ref('')
 const statusLabel=computed(()=>({READY:'พร้อมเริ่ม',LIVE:'กำลังถ่ายทอดสด',COMPLETED:'จับครบแล้ว',LOCKED:'ผลอย่างเป็นทางการ'})[store.status])
-const liveUrl=computed(()=>`/live/draw?division=${store.divisionKey}&projector=1`)
+const liveUrl=computed(()=>'/live/draw?projector=1')
 const canEditTeams=computed(()=>!store.locked)
 const drawStarted=computed(()=>store.drawnIds.length>0)
 const selectedSeparateCount=computed(()=>teamDraft.value.filter(team=>team.separate).length)
@@ -103,7 +103,7 @@ async function uploadLogo(team:{code:string;logoUrl?:string},event:Event){
 
       <aside class="control-rail">
         <section class="rail-card team-management-card"><div class="rail-icon">✎</div><div class="eyebrow">TEAM MANAGEMENT</div><h3>{{advancedSetup?'ตั้งค่าการจับสลาก':'รายชื่อและโลโก้ทีม'}}</h3><p>{{advancedSetup?'ตั้งค่ากติกาภายในก่อนเริ่มพิธี':'แก้ไขชื่อและโลโก้ของทีมทั้ง 12 ทีม'}}</p><button class="btn full" :disabled="busy||!canEditTeams" @click="openTeamEditor">{{advancedSetup?'เปิดการตั้งค่า':'แก้ไขข้อมูลทีม'}}</button><small v-if="drawStarted&&!store.locked">เริ่มพิธีแล้ว: ยังแก้ไขชื่อและโลโก้ทีมได้</small><small v-if="store.locked">ยืนยันผลแล้ว กรุณาปลดล็อกก่อนแก้ไขข้อมูลทีม</small></section>
-        <section class="rail-card output-card"><div class="rail-icon">▣</div><div class="eyebrow">PROGRAM OUTPUT</div><h3>Live Draw 16:9</h3><p>สำหรับ Projector, TV หรือ OBS พร้อมโหมดเต็มจอ</p><a class="btn gold full" :href="liveUrl" target="_blank">เปิดจอถ่ายทอดสด ↗</a></section>
+        <section class="rail-card output-card"><div class="rail-icon">▣</div><div class="eyebrow">PROGRAM OUTPUT</div><h3>Live Draw 16:9</h3><p>แสดงผลทั้ง 2 รุ่นในจอเดียว สำหรับ Projector, TV หรือ OBS</p><a class="btn gold full" :href="liveUrl" target="_blank">เปิดจอถ่ายทอดสด ↗</a></section>
         <section class="rail-card security-card"><div class="eyebrow">RESULT SECURITY</div><h3>{{store.locked?'Official Result Locked':'ยืนยันผลอย่างเป็นทางการ'}}</h3><p>{{store.locked?'ระบบป้องกันการจับซ้ำและแก้ผลแล้ว':'ล็อกได้เมื่อจับครบ '+store.totalTeams+' ทีม'}}</p><button class="btn full" :class="{danger:store.locked}" :disabled="busy || (!store.locked && store.drawnIds.length<store.totalTeams)" @click="run(store.toggleLock)">{{store.locked?'ปลดล็อกผล':'ล็อกผลการจับสลาก'}}</button></section>
         <section class="rail-card timeline-card"><div class="timeline-head"><div><div class="eyebrow">AUDIT TIMELINE</div><h3>ประวัติการควบคุม</h3></div><span>{{store.events.length}}</span></div><div v-if="store.events.length" class="audit-timeline"><div v-for="event in store.events.slice(0,12)" :key="event.id" :class="['audit-event',event.eventType.toLowerCase()]"><i></i><div><time>{{new Date(event.at).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}}</time><p>{{event.message}}</p><small v-if="event.actor">โดย {{event.actor}}</small></div></div></div><p v-else class="muted">ยังไม่มีกิจกรรมในรอบนี้</p></section>
         <button class="btn danger-outline full" :disabled="busy || store.locked" @click="reset">เริ่มพิธีใหม่และล้างผล</button>

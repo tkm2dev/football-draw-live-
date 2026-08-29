@@ -45,7 +45,7 @@ API: `http://localhost:4000`
 ## Routes
 
 - `/draw/admin` — Admin Draw Control
-- `/live/draw?division=SENIOR40&projector=1` — 16:9 Live Draw
+- `/live/draw?projector=1` — 16:9 Live Draw รวมผลทั้ง 2 รุ่น
 - `/groups` — official groups
 - `/matches` — match schedule and scores
 - `/standings` — automatic group tables

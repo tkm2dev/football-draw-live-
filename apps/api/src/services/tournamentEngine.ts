@@ -116,7 +116,7 @@ export async function updateMatch(key:DivisionKey,id:string,patch:MatchPatch,con
   if(!Number.isInteger(numericId))throw new Error('รหัสการแข่งขันไม่ถูกต้อง')
   return prisma.$transaction(async tx=>{
     const div=await division(tx,key)
-    await tx.$queryRaw`SELECT id FROM Match WHERE id = ${numericId} FOR UPDATE`
+    await tx.$queryRaw`SELECT id FROM \`Match\` WHERE id = ${numericId} FOR UPDATE`
     const existing=await tx.match.findFirst({where:{id:numericId,divisionId:div.id}})
     if(!existing)throw new Error('ไม่พบการแข่งขัน')
     const data:Prisma.MatchUpdateInput={}

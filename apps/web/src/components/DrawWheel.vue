@@ -8,6 +8,7 @@ const slice=computed(()=>360/Math.max(props.teams.length,1))
 const wheelBackground=computed(()=>`conic-gradient(from -90deg,${props.teams.map((_,index)=>`${palette[index%palette.length]} ${index*slice.value}deg ${(index+1)*slice.value}deg`).join(',')})`)
 const initials=(name:string)=>name.trim().split(/\s+/).slice(0,2).map(part=>part[0]).join('').toUpperCase()
 const markerStyle=(index:number)=>{const angle=index*slice.value+slice.value/2;return{transform:`rotate(${angle}deg) translateY(-92px) rotate(${-angle}deg)`}}
+const nameStyle=(index:number)=>{const angle=index*slice.value+slice.value/2;return{transform:`rotate(${angle}deg) translateY(-60px) rotate(90deg)`}}
 const wheel=ref<HTMLElement|null>(null)
 const settling=ref(false)
 let angle=0
@@ -54,6 +55,7 @@ onBeforeUnmount(()=>cancelAnimationFrame(frame))
     <div class="wheel-arena" aria-label="วงล้อสุ่มรายชื่อทีม">
       <span class="wheel-pointer"></span>
       <div ref="wheel" class="ceremony-wheel" :class="{settling}" :style="{background:wheelBackground}">
+        <span v-for="(team,index) in teams" :key="`name-${team.id}`" class="wheel-team-name" :class="{few:teams.length<=4}" :style="nameStyle(index)" :title="team.name">{{team.name}}</span>
         <span v-for="(team,index) in teams" :key="team.id" class="wheel-team-marker" :style="markerStyle(index)">
           <img v-if="team.logoUrl" :src="team.logoUrl" :alt="`โลโก้ ${team.name}`">
           <b v-else>{{initials(team.name)}}</b>

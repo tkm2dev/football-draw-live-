@@ -27,7 +27,7 @@ try{
   const ready=sockets.map(socket=>waitFor(socket,'draw:state',state=>state.divisionKey===division&&state.drawnIds.length===0))
   await post('/api/draw/reset',{divisionKey:division})
   await Promise.all(ready)
-  const spinning=sockets.map(socket=>waitFor(socket,'draw:spinning',event=>event.divisionKey===division&&event.teams.length>0&&event.durationMs+event.settleDurationMs>=4_000))
+  const spinning=sockets.map(socket=>waitFor(socket,'draw:spinning',event=>event.divisionKey===division&&event.teams.length===12&&event.durationMs+event.settleDurationMs>=4_000))
   const settling=sockets.map(socket=>waitFor(socket,'draw:settling',event=>event.divisionKey===division&&typeof event.targetTeamId==='string'))
   const updated=sockets.map(socket=>waitFor(socket,'draw:state',state=>state.divisionKey===division&&state.drawnIds.length===1))
   const startedAt=Date.now()

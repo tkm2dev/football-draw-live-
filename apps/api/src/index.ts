@@ -28,11 +28,14 @@ const logoUpload=multer({storage:multer.memoryStorage(),limits:{fileSize:MAX_LOG
 app.use('/uploads',express.static(uploadRoot,{dotfiles:'deny',fallthrough:true,maxAge:'30d',immutable:true}))
 
 const Division=z.enum(['PUBLIC','SENIOR40'])
+const DRAW_SPIN_MS=4200
+const spinningDivisions=new Set<DivisionKey>()
 const DivisionBody=z.object({divisionKey:Division})
 const TeamConfigurationBody=z.object({teams:z.array(z.object({code:z.string().min(1).max(30),name:z.string().trim().min(1).max(120)})).length(12),separateTeamCodes:z.array(z.string().min(1).max(30)).max(3)})
 const MatchPatch=z.object({homeScore:z.number().int().min(0).nullable().optional(),awayScore:z.number().int().min(0).nullable().optional(),status:z.enum(['SCHEDULED','LIVE','FINISHED']).optional(),kickoffAt:z.iso.datetime().nullable().optional(),field:z.string().max(120).optional()})
 const route=(handler:(req:Request,res:Response)=>Promise<void>)=>(req:Request,res:Response,next:NextFunction)=>handler(req,res).catch(next)
 const context=(req:Request):AuditContext=>({actor:String(req.header('x-admin-user')||'draw-admin').slice(0,120),ip:req.ip})
+const ensureNotSpinning=(key:DivisionKey)=>{if(spinningDivisions.has(key))throw new Error('กรุณารอวงล้อหยุดก่อนทำรายการถัดไป')}
 
 async function emit(key:DivisionKey,state?:Awaited<ReturnType<typeof getDrawState>>){
   const nextState=state??await getDrawState(key)
@@ -45,7 +48,7 @@ app.get('/api/health',route(async(_req,res)=>{
   catch{res.status(503).json({ok:false,name:'Football Draw Live API',version:'2.0.0',database:'unavailable'})}
 }))
 app.get('/api/draw/:division',route(async(req,res)=>{res.json(await getDrawState(Division.parse(req.params.division)))}))
-app.put('/api/divisions/:division/teams',route(async(req,res)=>{const key=Division.parse(req.params.division);const body=TeamConfigurationBody.parse(req.body);const state=await updateTeamConfiguration(key,body.teams,body.separateTeamCodes,context(req));await emit(key,state);res.json(state)}))
+app.put('/api/divisions/:division/teams',route(async(req,res)=>{const key=Division.parse(req.params.division);ensureNotSpinning(key);const body=TeamConfigurationBody.parse(req.body);const state=await updateTeamConfiguration(key,body.teams,body.separateTeamCodes,context(req));await emit(key,state);res.json(state)}))
 app.post('/api/teams/:division/:code/logo',logoUpload.single('logo'),route(async(req,res)=>{
   const key=Division.parse(req.params.division)
   const teamCode=z.string().min(1).max(30).parse(req.params.code)
@@ -66,10 +69,25 @@ app.post('/api/teams/:division/:code/logo',logoUpload.single('logo'),route(async
     res.json(result.state)
   }catch(error){await unlink(filePath).catch(()=>undefined);throw error}
 }))
-app.post('/api/draw/reset',route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;const state=await resetDraw(key,context(req));await emit(key,state);res.json(state)}))
-app.post('/api/draw/next',route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;const state=await drawNext(key,context(req));await emit(key,state);res.json(state)}))
-app.post('/api/draw/all',route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;const state=await drawAll(key,context(req));await emit(key,state);res.json(state)}))
-app.post('/api/draw/lock',route(async(req,res)=>{const body=DivisionBody.extend({locked:z.boolean()}).parse(req.body);const state=await setDrawLock(body.divisionKey,body.locked,context(req));await emit(body.divisionKey,state);res.json(state)}))
+app.post('/api/draw/reset',route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;ensureNotSpinning(key);const state=await resetDraw(key,context(req));await emit(key,state);res.json(state)}))
+app.post('/api/draw/next',route(async(req,res)=>{
+  const key=DivisionBody.parse(req.body).divisionKey
+  ensureNotSpinning(key)
+  const before=await getDrawState(key)
+  if(before.locked)throw new Error('การจับสลากถูกล็อกแล้ว')
+  const candidates=before.teams.filter(team=>!before.drawnIds.includes(team.id))
+  if(!candidates.length)throw new Error('กรุณาตรวจสอบ ผลการจับสลากครบทุกทีมแล้ว')
+  spinningDivisions.add(key)
+  try{
+    io.to(`division:${key}`).emit('draw:spinning',{divisionKey:key,teams:candidates,durationMs:DRAW_SPIN_MS,startedAt:new Date().toISOString()})
+    await new Promise(resolve=>setTimeout(resolve,DRAW_SPIN_MS))
+    const state=await drawNext(key,context(req))
+    await emit(key,state)
+    res.json(state)
+  }finally{spinningDivisions.delete(key)}
+}))
+app.post('/api/draw/all',route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;ensureNotSpinning(key);const state=await drawAll(key,context(req));await emit(key,state);res.json(state)}))
+app.post('/api/draw/lock',route(async(req,res)=>{const body=DivisionBody.extend({locked:z.boolean()}).parse(req.body);ensureNotSpinning(body.divisionKey);const state=await setDrawLock(body.divisionKey,body.locked,context(req));await emit(body.divisionKey,state);res.json(state)}))
 app.get('/api/tournament/:division',route(async(req,res)=>{res.json(await summary(Division.parse(req.params.division)))}))
 app.post('/api/matches/generate',route(async(req,res)=>{const key=DivisionBody.parse(req.body).divisionKey;const out=await generateGroupMatches(key,context(req));await emit(key);res.json(out)}))
 app.get('/api/matches/:division',route(async(req,res)=>{res.json(await listMatches(Division.parse(req.params.division)))}))

@@ -6,4 +6,5 @@ export interface Division{key:DivisionKey;name:string;subtitle:string;teams:Team
 export interface Match{id:string;divisionKey?:DivisionKey;stage:'GROUP'|'QF'|'SF'|'FINAL';group?:GroupCode;home:Team;away:Team;round:number;homeScore:number|null;awayScore:number|null;status:'SCHEDULED'|'LIVE'|'FINISHED';kickoffAt?:string|null;field?:string}
 export interface Standing{team:Team;p:number;w:number;d:number;l:number;gf:number;ga:number;gd:number;pts:number;rank:number}
 export interface DrawEvent{id:string;at:string;eventType:string;message:string;team?:Team;group?:GroupCode;actor?:string}
+export interface DrawSpinEvent{divisionKey:DivisionKey;teams:Team[];durationMs:number;startedAt:string}
 export interface DrawState{sessionId:string;divisionKey:DivisionKey;groups:GroupMap;drawnIds:string[];totalTeams:number;teams:Team[];separateTeamCodes:string[];currentReveal:null|{team:Team;group:GroupCode};status:'READY'|'LIVE'|'COMPLETED'|'LOCKED';locked:boolean;events:DrawEvent[]}

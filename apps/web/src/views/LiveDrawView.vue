@@ -2,6 +2,7 @@
 import {computed,onBeforeUnmount,onMounted,ref} from 'vue'
 import {useRoute} from 'vue-router'
 import GroupCard from '../components/GroupCard.vue'
+import DrawWheel from '../components/DrawWheel.vue'
 import TournamentCrest from '../components/TournamentCrest.vue'
 import {useTournamentStore} from '../stores/tournament'
 import type {DivisionKey} from '../lib/types'
@@ -12,7 +13,7 @@ const now=ref(new Date())
 const fullscreen=ref(false)
 let timer:number|undefined
 const featuredGroup=computed(()=>store.currentReveal?.group)
-const statusText=computed(()=>store.locked?'OFFICIAL RESULT':store.status==='COMPLETED'?'DRAW COMPLETED':store.status==='LIVE'?'LIVE DRAW IN PROGRESS':'STANDBY')
+const statusText=computed(()=>store.spinActive?'WHEEL IN MOTION':store.locked?'OFFICIAL RESULT':store.status==='COMPLETED'?'DRAW COMPLETED':store.status==='LIVE'?'LIVE DRAW IN PROGRESS':'STANDBY')
 async function toggleFullscreen(){if(!document.fullscreenElement)await document.documentElement.requestFullscreen();else await document.exitFullscreen();fullscreen.value=Boolean(document.fullscreenElement)}
 onMounted(async()=>{
   const key=route.query.division
@@ -38,7 +39,8 @@ onBeforeUnmount(()=>window.clearInterval(timer))
       <section class="reveal-stage">
         <div class="reveal-kicker"><span>{{statusText}}</span><b>{{store.drawnIds.length}} / {{store.totalTeams}}</b></div>
         <Transition name="broadcast-reveal" mode="out-in">
-          <div :key="store.currentReveal?.team.id||store.status" class="reveal-result">
+          <DrawWheel v-if="store.spinActive" key="wheel" :teams="store.spinTeams" :duration-ms="store.spinDurationMs"/>
+          <div v-else :key="store.currentReveal?.team.id||store.status" class="reveal-result">
             <span v-if="store.currentReveal" class="reveal-sweep" aria-hidden="true"></span>
             <template v-if="store.currentReveal"><div class="ball-seal" :class="{'has-team-logo':store.currentReveal.team.logoUrl}"><img v-if="store.currentReveal.team.logoUrl" :src="store.currentReveal.team.logoUrl" :alt="`โลโก้ ${store.currentReveal.team.name}`"><template v-else>⚽</template><i></i></div><div class="revealed-team"><small>TEAM REVEALED</small><strong>{{store.currentReveal.team.name}}</strong></div><div class="group-reveal"><small>GROUP</small><b>{{store.currentReveal.group}}</b></div></template>
             <template v-else><div class="ball-seal standby">13</div><div class="revealed-team"><small>OFFICIAL LIVE DRAW</small><strong>กำลังรอการจับสลาก</strong></div><div class="group-reveal idle"><small>GROUP</small><b>–</b></div></template>
@@ -50,6 +52,6 @@ onBeforeUnmount(()=>window.clearInterval(timer))
       <section class="live-groups"><GroupCard name="A" :teams="store.groups.A" :featured="featuredGroup==='A'"/><GroupCard name="B" :teams="store.groups.B" :featured="featuredGroup==='B'"/><GroupCard name="C" :teams="store.groups.C" :featured="featuredGroup==='C'"/><GroupCard name="D" :teams="store.groups.D" :featured="featuredGroup==='D'"/></section>
     </main>
 
-    <footer class="broadcast-footer"><div><i></i> LIVE • OFFICIAL DRAW FEED</div><strong>{{store.locked?'ผลการจับสลากอย่างเป็นทางการ • LOCKED':'ระบบจับสลากภายใต้เงื่อนไขการแข่งขัน'}}</strong><span>4 GROUPS • 12 TEAMS</span></footer>
+    <footer class="broadcast-footer"><div><i></i> LIVE • OFFICIAL DRAW FEED</div><strong>{{store.locked?'ผลการจับสลากอย่างเป็นทางการ • CONFIRMED':'สุ่มตามกติกาการแข่งขัน'}}</strong><span>4 GROUPS • 12 TEAMS</span></footer>
   </div>
 </template>

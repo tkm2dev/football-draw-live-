@@ -1,7 +1,7 @@
 import {defineStore} from 'pinia'
 import {io} from 'socket.io-client'
 import {divisions} from '../lib/data'
-import type {DivisionKey,DrawState,GroupMap,GroupCode,Match,Standing,Team} from '../lib/types'
+import type {DivisionKey,DrawSpinEvent,DrawState,GroupMap,GroupCode,Match,Standing,Team} from '../lib/types'
 
 const emptyGroups=():GroupMap=>({A:[],B:[],C:[],D:[]})
 const configuredApi=(import.meta as any).env?.VITE_API_URL as string|undefined
@@ -10,7 +10,7 @@ async function json(response:Response){const data=await response.json();if(!resp
 const writeHeaders={'content-type':'application/json','x-admin-user':'draw-control'}
 
 export const useTournamentStore=defineStore('tournament',{
-  state:()=>({divisionKey:'SENIOR40' as DivisionKey,groups:emptyGroups(),drawnIds:[] as string[],totalTeams:12,teams:[...divisions.find(division=>division.key==='SENIOR40')!.teams] as Team[],separateTeamCodes:['s2','s4','s9'] as string[],currentReveal:null as null|{team:Team;group:GroupCode},matches:[] as Match[],standings:{A:[],B:[],C:[],D:[]} as Record<GroupCode,Standing[]>,socket:null as any,status:'READY' as DrawState['status'],locked:false,events:[] as DrawState['events'],lastError:'',connected:false}),
+  state:()=>({divisionKey:'SENIOR40' as DivisionKey,groups:emptyGroups(),drawnIds:[] as string[],totalTeams:12,teams:[...divisions.find(division=>division.key==='SENIOR40')!.teams] as Team[],separateTeamCodes:['s2','s4','s9'] as string[],currentReveal:null as null|{team:Team;group:GroupCode},spinActive:false,spinTeams:[] as Team[],spinDurationMs:4200,matches:[] as Match[],standings:{A:[],B:[],C:[],D:[]} as Record<GroupCode,Standing[]>,socket:null as any,status:'READY' as DrawState['status'],locked:false,events:[] as DrawState['events'],lastError:'',connected:false}),
   getters:{
     division:state=>divisions.find(division=>division.key===state.divisionKey)!,
     remaining:state=>state.teams.filter(team=>!state.drawnIds.includes(team.id)),
@@ -19,13 +19,14 @@ export const useTournamentStore=defineStore('tournament',{
     knockoutMatches:state=>state.matches.filter(match=>match.stage!=='GROUP')
   },
   actions:{
-    applyState(state:DrawState){this.groups=state.groups;this.drawnIds=state.drawnIds;this.totalTeams=state.totalTeams||12;this.teams=state.teams||[];this.separateTeamCodes=state.separateTeamCodes||[];this.currentReveal=state.currentReveal;this.status=state.status;this.locked=state.locked;this.events=state.events||[]},
+    applyState(state:DrawState){this.groups=state.groups;this.drawnIds=state.drawnIds;this.totalTeams=state.totalTeams||12;this.teams=state.teams||[];this.separateTeamCodes=state.separateTeamCodes||[];this.currentReveal=state.currentReveal;this.status=state.status;this.locked=state.locked;this.events=state.events||[];this.spinActive=false},
     async setDivision(key:DivisionKey){this.divisionKey=key;this.socket?.emit('watch:division',key);await Promise.all([this.loadState(),this.loadTournament()])},
     connect(){
       if(this.socket){this.socket.emit('watch:division',this.divisionKey);return}
       this.socket=io(api)
       this.socket.on('connect',()=>{this.connected=true;this.socket.emit('watch:division',this.divisionKey)})
       this.socket.on('disconnect',()=>{this.connected=false})
+      this.socket.on('draw:spinning',(event:DrawSpinEvent)=>{if(event.divisionKey===this.divisionKey){this.spinTeams=event.teams;this.spinDurationMs=event.durationMs;this.spinActive=true}})
       this.socket.on('draw:state',(state:DrawState)=>{if(state.divisionKey===this.divisionKey)this.applyState(state)})
       this.socket.on('tournament:update',(state:any)=>{if(state.divisionKey===this.divisionKey){this.matches=state.matches||[];this.standings=state.standings||this.standings}})
       this.socket.on('server:error',(error:{message:string})=>{this.lastError=error.message})

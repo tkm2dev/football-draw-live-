@@ -13,7 +13,7 @@
 - Team logos can be uploaded from Team Management as PNG, JPG or WebP (maximum 5 MB); file signatures are validated and every change is audited
 - Extensible persisted rules: `SEPARATE_TEAMS`, `SEED_ACROSS_GROUPS`, `LOCK_TEAM_TO_GROUP`, `BLOCK_TEAM_FROM_GROUPS`
 - Admin Control is available without an application key; restrict the admin URL at the network or Cloudflare layer when external users can reach the deployment
-- Broadcast-style 16:9 Live Draw with team-by-team reveal, 0–12 progress, highlighted group, official lock state, audit timeline and fullscreen mode
+- Broadcast-style 16:9 Live Draw with a server-synchronised team wheel, team-by-team reveal, 0–12 progress, highlighted group, official result state, audit timeline and fullscreen mode
 - Socket.IO rooms keep Admin, Live and public screens synchronized per division
 - Match generation, scores, standings and knockout state are persisted in MySQL
 

@@ -5,7 +5,7 @@ import type {DivisionKey,DrawSettleEvent,DrawSpinEvent,DrawState,GroupMap,GroupC
 
 const emptyGroups=():GroupMap=>({A:[],B:[],C:[],D:[]})
 const configuredApi=(import.meta as any).env?.VITE_API_URL as string|undefined
-const api=configuredApi||((import.meta as any).env?.DEV?'http://localhost:4000':window.location.origin)
+export const api=configuredApi||((import.meta as any).env?.DEV?'http://localhost:4000':window.location.origin)
 async function json(response:Response){const data=await response.json();if(!response.ok)throw new Error(data.message||'เกิดข้อผิดพลาด');return data}
 const writeHeaders={'content-type':'application/json','x-admin-user':'draw-control'}
 

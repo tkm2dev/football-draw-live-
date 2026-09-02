@@ -2,7 +2,7 @@
 
 ระบบจัดการแข่งขันฟุตบอลเฉลิมพระเกียรติ ครั้งที่ 13/2569 ตั้งแต่พิธีจับสลากแบบ Live ถึงรอบชิง
 
-## Production draw phase
+## Production tournament phase
 
 - Prisma/MySQL is the source of truth; no draw or match runtime state is kept in memory
 - Serializable Prisma transactions plus MySQL row locks protect concurrent draw actions
@@ -44,12 +44,13 @@ API: `http://localhost:4000`
 
 ## Routes
 
-- `/draw/admin` — Admin Draw Control
-- `/live/draw?projector=1` — 16:9 Live Draw รวมผลทั้ง 2 รุ่น
-- `/groups` — official groups
-- `/matches` — match schedule and scores
+- `/matches` — public official schedule for both divisions
+- `/teams` — team directory and official groups
+- `/teams/:division/:code` — team profile, standings, fixtures and results
 - `/standings` — automatic group tables
-- `/bracket` — QF → SF → Final
-- `/public` — public tournament view
+- `/rounds` — public QF → SF → Final progression
+- `/results` — live and finished results
+- `/admin/results` — admin schedule, logos and result operations
+- `/draw/admin` and `/live/draw` — hidden legacy draw operations (direct URL only)
 
 Production deployment and the public-hostname gate are documented in [DEPLOY.md](DEPLOY.md).

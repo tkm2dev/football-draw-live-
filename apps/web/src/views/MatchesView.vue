@@ -84,7 +84,7 @@ onMounted(async()=>{s.connect();await Promise.all([s.loadState(),s.loadTournamen
 
 <template>
   <div class="page match-management-page">
-    <TopBar/>
+    <TopBar admin/>
     <main class="content match-management">
       <header class="match-management-head">
         <div><div class="eyebrow">MATCH OPERATIONS CENTER</div><h1>จัดโปรแกรมและบันทึกผลการแข่งขัน</h1><p>กำหนดวัน เวลา สนาม คู่แข่งขัน และบันทึกสกอร์จากหน้าจอเดียว</p></div>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {computed,onMounted} from 'vue'
 import GroupCard from '../components/GroupCard.vue'
+import TopBar from '../components/TopBar.vue'
 import {useTournamentStore} from '../stores/tournament'
 import type {OfficialScheduleEntry} from '../lib/types'
 const s=useTournamentStore()
@@ -18,7 +19,7 @@ onMounted(()=>{s.connect();Promise.all([s.loadState(),s.loadTournament(),s.loadO
 </script>
 
 <template>
-  <div class="public-page">
+  <div class="public-page"><TopBar/>
     <header class="public-hero"><div class="cup">🏆</div><div><small>OFFICIAL TOURNAMENT CENTER</small><h1>ฟุตบอลเฉลิมพระเกียรติ</h1><p>ครั้งที่ 13/2569 • ตารางแข่งขันอย่างเป็นทางการ</p></div><select v-model="s.divisionKey" @change="s.setDivision(s.divisionKey)"><option value="PUBLIC">ผลแบ่งสายรุ่นประชาชน</option><option value="SENIOR40">ผลแบ่งสายรุ่นอาวุโส 40+</option></select></header>
     <main class="public-content">
       <section><div class="section-title"><h2>ผลแบ่งสาย — {{s.division.name}}</h2><span>OFFICIAL</span></div><div class="group-grid"><GroupCard name="A" :teams="s.groups.A"/><GroupCard name="B" :teams="s.groups.B"/><GroupCard name="C" :teams="s.groups.C"/><GroupCard name="D" :teams="s.groups.D"/></div></section>
@@ -29,7 +30,7 @@ onMounted(()=>{s.connect();Promise.all([s.loadState(),s.loadTournament(),s.loadO
           <article v-for="day in scheduleDays" :key="day.date" class="public-schedule-day">
             <h3>{{dateTitle(day.date)}}</h3>
             <div class="public-schedule-scroll"><table><thead><tr><th>คู่</th><th>รุ่น</th><th>รอบ</th><th>เวลา</th><th>คู่แข่งขัน</th><th>ผล</th></tr></thead><tbody>
-              <template v-for="(entry,index) in day.entries" :key="entry.id"><tr v-if="lunchBefore(day.entries,index)" class="lunch-row"><td colspan="6">พักเที่ยง</td></tr><tr :class="{'special-row':entry.stage==='SPECIAL'}"><td><b>{{entry.sequenceNo}}</b></td><td><span :class="['division-chip',entry.divisionKey?.toLowerCase()||'special']">{{entry.categoryLabel}}</span></td><td>{{stageTitle(entry)}}</td><td><time>{{timeOnly(entry.startsAt)}}–{{timeOnly(entry.endsAt)}}</time></td><td><div class="public-schedule-versus"><span><img v-if="entry.home.logoUrl" :src="entry.home.logoUrl" alt=""><b>{{entry.home.name}}</b></span><strong>VS</strong><span><img v-if="entry.away.logoUrl" :src="entry.away.logoUrl" alt=""><b>{{entry.away.name}}</b></span></div></td><td><strong v-if="entry.homeScore!==null&&entry.awayScore!==null" class="official-score">{{entry.homeScore}}–{{entry.awayScore}}</strong><span v-else>—</span></td></tr></template>
+              <template v-for="(entry,index) in day.entries" :key="entry.id"><tr v-if="lunchBefore(day.entries,index)" class="lunch-row"><td colspan="6">พักเที่ยง</td></tr><tr :class="{'special-row':entry.stage==='SPECIAL'}"><td><b>{{entry.sequenceNo}}</b></td><td><span :class="['division-chip',entry.divisionKey?.toLowerCase()||'special']">{{entry.categoryLabel}}</span></td><td>{{stageTitle(entry)}}</td><td><time>{{timeOnly(entry.startsAt)}}–{{timeOnly(entry.endsAt)}}</time></td><td><div class="public-schedule-versus"><RouterLink v-if="entry.home.id" :to="`/teams/${entry.divisionKey}/${entry.home.id}`"><img v-if="entry.home.logoUrl" :src="entry.home.logoUrl" alt=""><b>{{entry.home.name}}</b></RouterLink><span v-else><b>{{entry.home.name}}</b></span><strong>VS</strong><RouterLink v-if="entry.away.id" :to="`/teams/${entry.divisionKey}/${entry.away.id}`"><img v-if="entry.away.logoUrl" :src="entry.away.logoUrl" alt=""><b>{{entry.away.name}}</b></RouterLink><span v-else><b>{{entry.away.name}}</b></span></div></td><td><strong v-if="entry.homeScore!==null&&entry.awayScore!==null" class="official-score">{{entry.homeScore}}–{{entry.awayScore}}</strong><span v-else>—</span></td></tr></template>
             </tbody></table></div>
           </article>
         </div>

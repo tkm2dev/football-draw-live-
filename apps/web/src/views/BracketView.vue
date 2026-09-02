@@ -1,9 +1,14 @@
 <script setup lang="ts">
-import {onMounted} from 'vue'
+import {computed,onMounted,ref} from 'vue'
 import TopBar from '../components/TopBar.vue'
 import {useTournamentStore} from '../stores/tournament'
-const s=useTournamentStore()
-onMounted(()=>s.loadTournament())
-const stages=['QF','SF','FINAL'] as const
+import type {DivisionKey,OfficialScheduleEntry} from '../lib/types'
+const s=useTournamentStore(),division=ref<DivisionKey>('PUBLIC')
+const stages=[{key:'QF',name:'รอบ 8 ทีม',caption:'QUARTER FINALS'},{key:'SF',name:'รอบรองชนะเลิศ',caption:'SEMI FINALS'},{key:'FINAL',name:'รอบชิงชนะเลิศ',caption:'FINAL'}] as const
+const stageRows=(stage:string)=>s.scheduleEntries.filter(item=>item.divisionKey===division.value&&item.stage===stage)
+const finished=computed(()=>s.scheduleEntries.filter(item=>item.divisionKey===division.value&&item.status==='FINISHED').length)
+const dateTime=(value:string)=>new Date(value).toLocaleString('th-TH',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Bangkok'})
+const teamUrl=(entry:OfficialScheduleEntry,side:'home'|'away')=>entry[side].id?`/teams/${entry.divisionKey}/${entry[side].id}`:''
+onMounted(()=>s.loadOfficialSchedule())
 </script>
-<template><div class="page"><TopBar/><main class="content"><div class="toolbar"><div><div class="eyebrow">KNOCKOUT</div><h2>รอบน็อกเอาต์</h2></div><div class="actions"><button class="btn" @click="s.generateKnockout">สร้าง QF</button><button class="btn gold" @click="s.advanceKnockout">เลื่อนรอบถัดไป</button></div></div><div class="bracket"><section v-for="stage in stages" :key="stage" class="bracket-col"><h3>{{stage==='QF'?'รอบ 8 ทีม':stage==='SF'?'รอบรอง':'รอบชิง'}}</h3><article v-for="m in s.knockoutMatches.filter(x=>x.stage===stage)" :key="m.id" class="bracket-match"><div><span>{{m.home.name}}</span><input type="number" min="0" v-model.number="m.homeScore"></div><div><span>{{m.away.name}}</span><input type="number" min="0" v-model.number="m.awayScore"></div><button class="mini" @click="s.saveScore(m)">บันทึกผล</button></article><div v-if="!s.knockoutMatches.some(x=>x.stage===stage)" class="empty-slot">รอผลการแข่งขัน</div></section></div></main></div></template>
+<template><div class="page rounds-page"><TopBar/><main class="content rounds-content"><header class="hub-heading"><div><div class="eyebrow">TOURNAMENT ROAD</div><h1>รอบการแข่งขัน</h1><p>เส้นทางจากรอบ 8 ทีมสู่รอบชิงชนะเลิศ ระบบจะเติมชื่อทีมตามผลการแข่งขันโดยอัตโนมัติ</p></div><label class="division-select"><span>รุ่นการแข่งขัน</span><select v-model="division"><option value="PUBLIC">รุ่นประชาชน</option><option value="SENIOR40">รุ่นอาวุโส 40+</option></select></label></header><section class="rounds-summary"><div><small>DIVISION</small><b>{{division==='PUBLIC'?'รุ่นประชาชน':'รุ่นอาวุโส 40+'}}</b></div><div><small>QUALIFIERS</small><b>8 ทีม</b></div><div><small>RESULTS</small><b>{{finished}} นัด</b></div></section><div class="public-bracket"><section v-for="stage in stages" :key="stage.key" :class="['public-bracket-stage',stage.key.toLowerCase()]"><header><small>{{stage.caption}}</small><h2>{{stage.name}}</h2></header><article v-for="entry in stageRows(stage.key)" :key="entry.id" :class="entry.status.toLowerCase()"><div class="bracket-fixture-meta"><b>คู่ที่ {{entry.sequenceNo}}</b><time>{{dateTime(entry.startsAt)}}</time></div><div class="bracket-team"><RouterLink v-if="teamUrl(entry,'home')" :to="teamUrl(entry,'home')">{{entry.home.name}}</RouterLink><b v-else>{{entry.home.name}}</b><strong>{{entry.homeScore??'-'}}</strong></div><div class="bracket-team"><RouterLink v-if="teamUrl(entry,'away')" :to="teamUrl(entry,'away')">{{entry.away.name}}</RouterLink><b v-else>{{entry.away.name}}</b><strong>{{entry.awayScore??'-'}}</strong></div><footer>{{entry.status==='FINISHED'?'จบการแข่งขัน':entry.status==='LIVE'?'กำลังแข่งขัน':'รอผลทีมเข้ารอบ'}}</footer></article></section></div></main></div></template>

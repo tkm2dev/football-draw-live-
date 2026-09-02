@@ -2,7 +2,7 @@
 import {computed,onBeforeUnmount,onMounted,ref,watch} from 'vue'
 import TopBar from '../components/TopBar.vue'
 import {useTournamentStore} from '../stores/tournament'
-import type {GroupCode,Match,OfficialScheduleEntry,Team} from '../lib/types'
+import type {DivisionKey,GroupCode,Match,OfficialScheduleEntry,Team} from '../lib/types'
 
 interface MatchDraft{id:string;sequenceNo:number;group:GroupCode;round:number;homeTeamCode:string;awayTeamCode:string;kickoffLocal:string;field:string;homeScore:number|null;awayScore:number|null;status:Match['status']}
 const s=useTournamentStore()
@@ -42,7 +42,10 @@ const initials=(name:string)=>name.trim().split(/\s+/).slice(0,2).map(part=>part
 const score=(value:unknown)=>value===''||value===null||value===undefined?null:Number(value)
 
 async function run(action:()=>Promise<void>,success:string){busy.value=true;message.value='';try{await action();message.value=success;messageType.value='ok'}catch(error){message.value=error instanceof Error?error.message:'เกิดข้อผิดพลาด';messageType.value='error'}finally{busy.value=false}}
-async function changeDivision(){logoEditor.value=false;await run(async()=>{await s.setDivision(s.divisionKey);syncDrafts()},'โหลดข้อมูลการแข่งขันแล้ว')}
+async function selectDivision(key:DivisionKey){
+  if(busy.value||key===s.divisionKey)return
+  await run(async()=>{await s.setDivision(key);syncDrafts()},`เปลี่ยนเป็น${key==='PUBLIC'?'รุ่นประชาชน':'รุ่นอาวุโส 40+'}แล้ว`)
+}
 async function installOfficial(){
   if(s.scheduleEntries.length&&!window.confirm('ติดตั้งตารางทางการใหม่? โปรแกรมเดิมที่ยังไม่เริ่มแข่งจะถูกแทนที่'))return
   await run(async()=>{await s.installOfficialSchedule();syncDrafts()},'ติดตั้งตารางทางการครบ 39 คู่ และผูกรอบแบ่งกลุ่ม 24 คู่แล้ว')
@@ -120,7 +123,7 @@ onBeforeUnmount(()=>window.removeEventListener('paste',pasteLogo))
     <main class="content match-management">
       <header class="match-management-head">
         <div><div class="eyebrow">MATCH OPERATIONS CENTER</div><h1>จัดโปรแกรมและบันทึกผลการแข่งขัน</h1><p>กำหนดวัน เวลา สนาม คู่แข่งขัน และบันทึกสกอร์จากหน้าจอเดียว</p></div>
-        <label class="division-select"><span>รุ่นการแข่งขัน</span><select v-model="s.divisionKey" :disabled="busy" @change="changeDivision"><option value="PUBLIC">รุ่นประชาชน</option><option value="SENIOR40">รุ่นอาวุโส 40+</option></select></label>
+        <div class="public-division-switch admin-division-switch" role="group" aria-label="เลือกรุ่นการแข่งขัน"><small>เลือกรุ่นการแข่งขัน</small><div><button :class="{active:s.divisionKey==='PUBLIC'}" :aria-pressed="s.divisionKey==='PUBLIC'" :disabled="busy" @click="selectDivision('PUBLIC')"><span>รุ่นประชาชน</span><small>จัดตารางและผลการแข่งขัน</small></button><button :class="{active:s.divisionKey==='SENIOR40'}" :aria-pressed="s.divisionKey==='SENIOR40'" :disabled="busy" @click="selectDivision('SENIOR40')"><span>รุ่นอาวุโส 40+</span><small>จัดตารางและผลการแข่งขัน</small></button></div></div>
       </header>
 
       <section class="match-summary-strip">

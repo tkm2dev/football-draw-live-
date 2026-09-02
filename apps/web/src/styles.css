@@ -90,3 +90,6 @@ body{background:#020817;color:#f8fbff}.premium-page,.draw-control-page,.public-p
 
 /* Team links in public group tables */
 .team-row.team-link{padding-right:34px;cursor:pointer;transition:background .18s ease,box-shadow .18s ease,transform .18s ease}.team-row.team-link:after{content:"›";position:absolute;right:13px;top:50%;color:#6e9dca;font-size:1.45rem;line-height:1;transform:translateY(-50%);transition:color .18s ease,transform .18s ease}.team-row.team-link:hover,.team-row.team-link:focus-visible{z-index:2;background:linear-gradient(90deg,#0e3973,#0a2855);box-shadow:inset 3px 0 var(--group-accent);outline:0}.team-row.team-link:hover:after,.team-row.team-link:focus-visible:after{color:#f6d66d;transform:translate(3px,-50%)}.team-row.team-link:hover .team-name,.team-row.team-link:focus-visible .team-name{color:#f8dc79}
+
+/* Admin division buttons */
+.admin-division-switch{min-width:500px}.admin-division-switch button{text-align:center}.admin-division-switch button small{line-height:1.15}@media(max-width:1100px){.match-management-head{display:grid;align-items:start}.admin-division-switch{width:100%;min-width:0;margin-left:0}}

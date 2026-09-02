@@ -2,7 +2,7 @@
 import {computed,onMounted,ref,watch} from 'vue'
 import TopBar from '../components/TopBar.vue'
 import {useTournamentStore} from '../stores/tournament'
-import type {GroupCode,Match,Team} from '../lib/types'
+import type {GroupCode,Match,OfficialScheduleEntry,Team} from '../lib/types'
 
 interface MatchDraft{id:string;group:GroupCode;round:number;homeTeamCode:string;awayTeamCode:string;kickoffLocal:string;field:string;homeScore:number|null;awayScore:number|null;status:Match['status']}
 const s=useTournamentStore()
@@ -20,6 +20,11 @@ const logoEditor=ref(false)
 const uploadingCode=ref('')
 const groupCodes:GroupCode[]=['A','B','C','D']
 const finishedCount=computed(()=>s.groupMatches.filter(match=>match.status==='FINISHED').length)
+const officialDays=computed(()=>{
+  const days=new Map<string,OfficialScheduleEntry[]>()
+  for(const entry of s.scheduleEntries){const key=entry.startsAt.slice(0,10);days.set(key,[...(days.get(key)??[]),entry])}
+  return[...days.entries()].map(([date,entries])=>({date,entries}))
+})
 
 const localInput=(iso:string|null|undefined)=>{
   if(!iso)return''
@@ -36,10 +41,14 @@ const score=(value:unknown)=>value===''||value===null||value===undefined?null:Nu
 
 async function run(action:()=>Promise<void>,success:string){busy.value=true;message.value='';try{await action();message.value=success;messageType.value='ok'}catch(error){message.value=error instanceof Error?error.message:'เกิดข้อผิดพลาด';messageType.value='error'}finally{busy.value=false}}
 async function changeDivision(){logoEditor.value=false;await run(async()=>{await s.setDivision(s.divisionKey);syncDrafts()},'โหลดข้อมูลการแข่งขันแล้ว')}
-async function generate(){
-  if(drafts.value.length&&!window.confirm('สร้างโปรแกรมใหม่จากผลแบ่งสาย? วันเวลาและสนามที่กรอกไว้จะถูกแทนที่'))return
-  await run(async()=>{await s.generateMatches();syncDrafts()},'สร้างโปรแกรมรอบแบ่งกลุ่ม 12 นัดแล้ว')
+async function installOfficial(){
+  if(s.scheduleEntries.length&&!window.confirm('ติดตั้งตารางทางการใหม่? โปรแกรมเดิมที่ยังไม่เริ่มแข่งจะถูกแทนที่'))return
+  await run(async()=>{await s.installOfficialSchedule();syncDrafts()},'ติดตั้งตารางทางการครบ 39 คู่ และผูกรอบแบ่งกลุ่ม 24 คู่แล้ว')
 }
+const dateTitle=(date:string)=>new Date(`${date}T12:00:00+07:00`).toLocaleDateString('th-TH',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'Asia/Bangkok'})
+const timeOnly=(value:string)=>new Date(value).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Bangkok'})
+const stageTitle=(entry:OfficialScheduleEntry)=>entry.stage==='GROUP'?`สาย ${entry.groupLabel}`:entry.stage==='QF'?`รอบ 8 ทีม ${entry.groupLabel}`:entry.stage==='SF'?'รอบรองชนะเลิศ':entry.stage==='FINAL'?'รอบชิงชนะเลิศ':'คู่พิเศษ'
+const lunchBefore=(entries:OfficialScheduleEntry[],index:number)=>index>0&&new Date(entries[index].startsAt).getTime()-new Date(entries[index-1].endsAt).getTime()>=60*60_000
 function applyDatePlan(){
   if(!scheduleDate.value||!startTime.value){message.value='กรุณาเลือกวันที่และเวลาเริ่มแข่งขัน';messageType.value='error';return}
   const first=new Date(`${scheduleDate.value}T${startTime.value}:00`)
@@ -70,7 +79,7 @@ async function uploadLogo(code:string,event:Event){
   try{await s.uploadTeamLogo(code,file);await s.loadTournament();syncDrafts();message.value='อัปเดตโลโก้ทีมแล้ว';messageType.value='ok'}catch(error){message.value=error instanceof Error?error.message:'อัปโหลดโลโก้ไม่สำเร็จ';messageType.value='error'}finally{uploadingCode.value='';input.value=''}
 }
 
-onMounted(async()=>{s.connect();await Promise.all([s.loadState(),s.loadTournament()]);syncDrafts()})
+onMounted(async()=>{s.connect();await Promise.all([s.loadState(),s.loadTournament(),s.loadOfficialSchedule()]);syncDrafts()})
 </script>
 
 <template>
@@ -86,12 +95,22 @@ onMounted(async()=>{s.connect();await Promise.all([s.loadState(),s.loadTournamen
         <div><small>DIVISION</small><strong>{{s.division.name}}</strong><span>{{s.division.subtitle}}</span></div>
         <div><small>GROUP MATCHES</small><strong>{{s.groupMatches.length}} / 12</strong><span>โปรแกรมรอบแบ่งกลุ่ม</span></div>
         <div><small>FINISHED</small><strong>{{finishedCount}} / 12</strong><span>ผลที่ยืนยันแล้ว</span></div>
-        <div class="match-summary-actions"><button class="btn" :disabled="busy" @click="logoEditor=!logoEditor">แก้ไขโลโก้ทีม</button><button class="btn gold" :disabled="busy" @click="generate">{{drafts.length?'สร้างโปรแกรมใหม่':'สร้างโปรแกรม 12 นัด'}}</button></div>
+        <div class="match-summary-actions"><button class="btn" :disabled="busy" @click="logoEditor=!logoEditor">แก้ไขโลโก้ทีม</button><button class="btn gold" :disabled="busy" @click="installOfficial">{{s.scheduleEntries.length?'ติดตั้งตารางทางการใหม่':'ใช้ตารางทางการ 39 คู่'}}</button></div>
       </section>
 
       <section v-if="logoEditor" class="match-logo-editor">
         <header><div><div class="eyebrow">TEAM BRANDING</div><h2>โลโก้ทีม — {{s.division.name}}</h2></div><button class="editor-close" @click="logoEditor=false">×</button></header>
         <div class="match-logo-grid"><label v-for="item in s.teams" :key="item.id" class="match-logo-item"><span><img v-if="item.logoUrl" :src="item.logoUrl" :alt="`โลโก้ ${item.name}`"><b v-else>{{initials(item.name)}}</b></span><strong>{{item.name}}</strong><em>{{uploadingCode===item.id?'กำลังอัปโหลด...':item.logoUrl?'เปลี่ยนโลโก้':'เพิ่มโลโก้'}}</em><input type="file" accept="image/png,image/jpeg,image/webp" :disabled="Boolean(uploadingCode)" @change="uploadLogo(item.id,$event)"></label></div>
+      </section>
+
+      <section v-if="officialDays.length" class="official-schedule-card">
+        <header><div><div class="eyebrow">OFFICIAL TOURNAMENT SCHEDULE</div><h2>ตารางแข่งขันรวมทั้ง 2 รุ่น — 39 คู่</h2><p>รอบแบ่งกลุ่ม 24 คู่ • รอบ 8 ทีม 8 คู่ • รอบรอง 4 คู่ • รอบชิง 2 คู่ • คู่พิเศษ 1 คู่</p></div><span class="official-badge">ยืนยันตามกำหนดการ</span></header>
+        <div v-for="day in officialDays" :key="day.date" class="official-day">
+          <h3>{{dateTitle(day.date)}}</h3>
+          <div class="official-table-scroll"><table class="official-schedule-table"><thead><tr><th>คู่ที่</th><th>รุ่น</th><th>สาย/รอบ</th><th>เวลา</th><th>คู่แข่งขัน</th><th>ผล</th><th>สถานะ</th></tr></thead><tbody>
+            <template v-for="(entry,index) in day.entries" :key="entry.id"><tr v-if="lunchBefore(day.entries,index)" class="lunch-row"><td colspan="7">พักเที่ยง</td></tr><tr :class="[entry.status.toLowerCase(),{'special-row':entry.stage==='SPECIAL'}]"><td><b>{{entry.sequenceNo}}</b></td><td><span :class="['division-chip',entry.divisionKey?.toLowerCase()||'special']">{{entry.categoryLabel}}</span></td><td>{{stageTitle(entry)}}</td><td><time>{{timeOnly(entry.startsAt)}}–{{timeOnly(entry.endsAt)}}</time></td><td><div class="official-versus"><span><img v-if="entry.home.logoUrl" :src="entry.home.logoUrl" alt=""><b>{{entry.home.name}}</b></span><strong>VS</strong><span><img v-if="entry.away.logoUrl" :src="entry.away.logoUrl" alt=""><b>{{entry.away.name}}</b></span></div></td><td><b v-if="entry.homeScore!==null&&entry.awayScore!==null" class="official-score">{{entry.homeScore}}–{{entry.awayScore}}</b><span v-else>—</span></td><td><span class="schedule-status">{{entry.status==='FINISHED'?'จบแล้ว':entry.status==='LIVE'?'กำลังแข่ง':'รอแข่ง'}}</span></td></tr></template>
+          </tbody></table></div>
+        </div>
       </section>
 
       <section v-if="drafts.length" class="schedule-planner">
@@ -104,7 +123,7 @@ onMounted(async()=>{s.connect();await Promise.all([s.loadState(),s.loadTournamen
       </section>
 
       <p v-if="message" :class="['match-message',messageType]">{{message}}</p>
-      <div v-if="!drafts.length" class="match-empty-state"><b>ยังไม่มีโปรแกรมการแข่งขัน</b><p>ผลแบ่งสายของรุ่นนี้ต้องครบและล็อกอย่างเป็นทางการแล้ว จากนั้นกด “สร้างโปรแกรม 12 นัด”</p><button class="btn gold" :disabled="busy" @click="generate">สร้างโปรแกรมจากผลแบ่งสาย</button></div>
+      <div v-if="!drafts.length" class="match-empty-state"><b>ยังไม่มีโปรแกรมการแข่งขัน</b><p>ผลแบ่งสายทั้งสองรุ่นต้องครบและล็อกอย่างเป็นทางการแล้ว จากนั้นติดตั้งตาราง 39 คู่ตามกำหนดการ</p><button class="btn gold" :disabled="busy" @click="installOfficial">ใช้ตารางทางการ 39 คู่</button></div>
 
       <section v-else class="match-table-card">
         <header><div><div class="eyebrow">OFFICIAL FIXTURES & RESULTS</div><h2>ตารางแข่งขันและบันทึกผล</h2></div><button class="btn gold" :disabled="busy" @click="saveSchedule">{{busy?'กำลังบันทึก...':'บันทึกโปรแกรมทั้งหมด'}}</button></header>

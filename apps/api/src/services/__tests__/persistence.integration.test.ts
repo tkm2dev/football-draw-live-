@@ -85,4 +85,33 @@ integration('Prisma/MySQL draw and match persistence',()=>{
     expect(table[first.group!].find(row=>row.team.id===first.home.id)?.pts).toBe(3)
     expect((await listMatches('SENIOR40')).filter(match=>match.status==='FINISHED')).toHaveLength(1)
   })
+
+  it('installs and links the complete 39-match official timetable atomically',async()=>{
+    const {drawAll,resetDraw,setDrawLock}=await import('../drawService.js')
+    const {installOfficialSchedule,listOfficialSchedule}=await import('../officialSchedule.js')
+    const {updateMatch}=await import('../tournamentEngine.js')
+    const {prisma}=await import('../../db.js')
+    await resetDraw('PUBLIC',{actor:'integration-test'})
+    await drawAll('PUBLIC',{actor:'integration-test'})
+    await setDrawLock('PUBLIC',true,{actor:'integration-test'})
+    await prisma.match.deleteMany()
+    await prisma.groupTeam.deleteMany()
+    const assignments={PUBLIC:{A:['p3','p4','p7'],B:['p6','p1','p5'],C:['p9','p10','p8'],D:['p11','p12','p2']},SENIOR40:{A:['s9','s6','s8'],B:['s1','s10','s12'],C:['s3','s2','s11'],D:['s5','s4','s7']}} as const
+    for(const [divisionType,groups] of Object.entries(assignments)){
+      const div=await prisma.division.findFirstOrThrow({where:{type:divisionType as 'PUBLIC'|'SENIOR40'},include:{teams:true,groups:true}})
+      for(const [code,teamCodes] of Object.entries(groups)){
+        const group=div.groups.find(item=>item.code===code)!
+        await prisma.groupTeam.createMany({data:(teamCodes as readonly string[]).map((teamCode:string,drawOrder:number)=>({groupId:group.id,teamId:div.teams.find(team=>team.code===teamCode)!.id,drawOrder:drawOrder+1}))})
+      }
+    }
+    const installed=await installOfficialSchedule({actor:'integration-test'})
+    expect(installed).toHaveLength(39)
+    expect(installed.filter(item=>item.matchId)).toHaveLength(24)
+    expect(installed.find(item=>item.sequenceNo===38)?.home.name).toBe('Vip หมออลงกต')
+    expect(await prisma.match.count()).toBe(24)
+    expect(await prisma.scheduleEntry.count()).toBe(39)
+    const first=installed[0]
+    await updateMatch('PUBLIC',first.matchId!,{homeScore:1,awayScore:0,status:'FINISHED'},{actor:'integration-test'})
+    expect((await listOfficialSchedule())[0]).toMatchObject({homeScore:1,awayScore:0,status:'FINISHED'})
+  })
 })

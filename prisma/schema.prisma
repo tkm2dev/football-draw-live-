@@ -48,6 +48,7 @@ model Tournament {
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
   divisions Division[]
+  scheduleEntries ScheduleEntry[]
 
   @@unique([edition, year])
 }
@@ -167,8 +168,36 @@ model Match {
   division   Division    @relation(fields: [divisionId], references: [id], onDelete: Cascade)
   home       Team        @relation("home", fields: [homeTeamId], references: [id])
   away       Team        @relation("away", fields: [awayTeamId], references: [id])
+  scheduleEntry ScheduleEntry?
 
   @@index([divisionId, stage, groupCode])
+}
+
+model ScheduleEntry {
+  id            Int           @id @default(autoincrement())
+  tournamentId  Int
+  sequenceNo    Int
+  divisionType  DivisionType?
+  categoryLabel String
+  stage         String
+  groupLabel    String?
+  startsAt      DateTime
+  endsAt        DateTime
+  homeLabel     String
+  awayLabel     String
+  homeScore     Int?
+  awayScore     Int?
+  status        MatchStatus   @default(SCHEDULED)
+  field         String?
+  notes         String?
+  matchId       Int?          @unique
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  tournament    Tournament    @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  match         Match?        @relation(fields: [matchId], references: [id], onDelete: SetNull)
+
+  @@unique([tournamentId, sequenceNo])
+  @@index([tournamentId, startsAt])
 }
 
 model AuditLog {

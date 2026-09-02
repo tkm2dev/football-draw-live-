@@ -1,7 +1,7 @@
 import {defineStore} from 'pinia'
 import {io} from 'socket.io-client'
 import {divisions} from '../lib/data'
-import type {DivisionKey,DrawSettleEvent,DrawSpinEvent,DrawState,GroupMap,GroupCode,Match,Standing,Team} from '../lib/types'
+import type {DivisionKey,DrawSettleEvent,DrawSpinEvent,DrawState,GroupMap,GroupCode,Match,OfficialScheduleEntry,Standing,Team} from '../lib/types'
 
 const emptyGroups=():GroupMap=>({A:[],B:[],C:[],D:[]})
 const configuredApi=(import.meta as any).env?.VITE_API_URL as string|undefined
@@ -10,7 +10,7 @@ async function json(response:Response){const data=await response.json();if(!resp
 const writeHeaders={'content-type':'application/json','x-admin-user':'draw-control'}
 
 export const useTournamentStore=defineStore('tournament',{
-  state:()=>({divisionKey:'SENIOR40' as DivisionKey,groups:emptyGroups(),drawnIds:[] as string[],totalTeams:12,teams:[...divisions.find(division=>division.key==='SENIOR40')!.teams] as Team[],separateTeamCodes:['s2','s4','s9'] as string[],currentReveal:null as null|{team:Team;group:GroupCode},spinActive:false,spinTeams:[] as Team[],spinDurationMs:2600,spinSettleDurationMs:1800,spinTargetTeamId:'' as string,matches:[] as Match[],standings:{A:[],B:[],C:[],D:[]} as Record<GroupCode,Standing[]>,socket:null as any,status:'READY' as DrawState['status'],locked:false,events:[] as DrawState['events'],lastError:'',connected:false}),
+  state:()=>({divisionKey:'SENIOR40' as DivisionKey,groups:emptyGroups(),drawnIds:[] as string[],totalTeams:12,teams:[...divisions.find(division=>division.key==='SENIOR40')!.teams] as Team[],separateTeamCodes:['s2','s4','s9'] as string[],currentReveal:null as null|{team:Team;group:GroupCode},spinActive:false,spinTeams:[] as Team[],spinDurationMs:2600,spinSettleDurationMs:1800,spinTargetTeamId:'' as string,matches:[] as Match[],scheduleEntries:[] as OfficialScheduleEntry[],standings:{A:[],B:[],C:[],D:[]} as Record<GroupCode,Standing[]>,socket:null as any,status:'READY' as DrawState['status'],locked:false,events:[] as DrawState['events'],lastError:'',connected:false}),
   getters:{
     division:state=>divisions.find(division=>division.key===state.divisionKey)!,
     remaining:state=>state.teams.filter(team=>!state.drawnIds.includes(team.id)),
@@ -34,6 +34,8 @@ export const useTournamentStore=defineStore('tournament',{
     },
     async loadState(){this.applyState(await json(await fetch(`${api}/api/draw/${this.divisionKey}`)))},
     async loadTournament(){const state=await json(await fetch(`${api}/api/tournament/${this.divisionKey}`));this.matches=state.matches||[];this.standings=state.standings||this.standings},
+    async loadOfficialSchedule(){this.scheduleEntries=await json(await fetch(`${api}/api/schedule`))},
+    async installOfficialSchedule(){this.scheduleEntries=await this.post('/api/schedule/official',{});await this.loadTournament()},
     async post(url:string,body:unknown){return json(await fetch(`${api}${url}`,{method:'POST',headers:writeHeaders,body:JSON.stringify(body)}))},
     async saveTeamConfiguration(teams:{code:string;name:string}[],separateTeamCodes:string[]){this.applyState(await json(await fetch(`${api}/api/divisions/${this.divisionKey}/teams`,{method:'PUT',headers:writeHeaders,body:JSON.stringify({teams,separateTeamCodes})})))},
     async uploadTeamLogo(teamCode:string,file:File){const body=new FormData();body.append('logo',file);const state=await json(await fetch(`${api}/api/teams/${this.divisionKey}/${teamCode}/logo`,{method:'POST',headers:{'x-admin-user':'draw-control'},body}));this.applyState(state);return state as DrawState},
@@ -41,9 +43,9 @@ export const useTournamentStore=defineStore('tournament',{
     async drawNext(){this.applyState(await this.post('/api/draw/next',{divisionKey:this.divisionKey}))},
     async drawAll(){this.applyState(await this.post('/api/draw/all',{divisionKey:this.divisionKey}))},
     async toggleLock(){this.applyState(await this.post('/api/draw/lock',{divisionKey:this.divisionKey,locked:!this.locked}))},
-    async generateMatches(){this.matches=await this.post('/api/matches/generate',{divisionKey:this.divisionKey});await this.loadTournament()},
-    async saveSchedule(matches:Array<{id:string;homeTeamCode:string;awayTeamCode:string;kickoffAt:string|null;field:string}>){this.matches=await json(await fetch(`${api}/api/matches/${this.divisionKey}/schedule`,{method:'PUT',headers:writeHeaders,body:JSON.stringify({matches})}));await this.loadTournament()},
-    async saveMatchResult(id:string,homeScore:number|null,awayScore:number|null,status:Match['status']){await json(await fetch(`${api}/api/matches/${this.divisionKey}/${id}`,{method:'PATCH',headers:writeHeaders,body:JSON.stringify({homeScore,awayScore,status})}));await this.loadTournament()},
+    async generateMatches(){this.matches=await this.post('/api/matches/generate',{divisionKey:this.divisionKey});await Promise.all([this.loadTournament(),this.loadOfficialSchedule()])},
+    async saveSchedule(matches:Array<{id:string;homeTeamCode:string;awayTeamCode:string;kickoffAt:string|null;field:string}>){this.matches=await json(await fetch(`${api}/api/matches/${this.divisionKey}/schedule`,{method:'PUT',headers:writeHeaders,body:JSON.stringify({matches})}));await Promise.all([this.loadTournament(),this.loadOfficialSchedule()])},
+    async saveMatchResult(id:string,homeScore:number|null,awayScore:number|null,status:Match['status']){await json(await fetch(`${api}/api/matches/${this.divisionKey}/${id}`,{method:'PATCH',headers:writeHeaders,body:JSON.stringify({homeScore,awayScore,status})}));await Promise.all([this.loadTournament(),this.loadOfficialSchedule()])},
     async saveScore(match:Match){await this.saveMatchResult(match.id,match.homeScore,match.awayScore,'FINISHED')},
     async generateKnockout(){await this.post('/api/knockout/generate',{divisionKey:this.divisionKey});await this.loadTournament()},
     async advanceKnockout(){await this.post('/api/knockout/advance',{divisionKey:this.divisionKey});await this.loadTournament()}

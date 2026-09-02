@@ -132,6 +132,7 @@ onBeforeUnmount(()=>window.removeEventListener('paste',pasteLogo))
         <div><small>FINISHED</small><strong>{{finishedCount}} / 12</strong><span>ผลที่ยืนยันแล้ว</span></div>
         <div class="match-summary-actions"><button class="btn" :disabled="busy" @click="logoEditor=!logoEditor">แก้ไขโลโก้ทีม</button><button class="btn gold" :disabled="busy" @click="installOfficial">{{s.scheduleEntries.length?'ติดตั้งตารางทางการใหม่':'ใช้ตารางทางการ 39 คู่'}}</button></div>
       </section>
+      <p v-if="message" :class="['match-message',messageType]" role="status">{{message}}</p>
 
       <section v-if="logoEditor" class="match-logo-editor">
         <header><div><div class="eyebrow">TEAM BRANDING</div><h2>โลโก้ทีม — {{s.division.name}}</h2><p>คลิกเลือกไฟล์ ลากไฟล์มาวาง หรือชี้เมาส์บนทีมแล้วกด Ctrl+V / ⌘+V เพื่อวางรูปจาก Clipboard • PNG, JPG, WebP ไม่เกิน 5 MB</p></div><button class="editor-close" @click="logoEditor=false">×</button></header>
@@ -157,7 +158,6 @@ onBeforeUnmount(()=>window.removeEventListener('paste',pasteLogo))
         <button class="btn gold" @click="applyDatePlan">จัดเวลาให้อัตโนมัติ</button>
       </section>
 
-      <p v-if="message" :class="['match-message',messageType]">{{message}}</p>
       <div v-if="!drafts.length" class="match-empty-state"><b>ยังไม่มีโปรแกรมการแข่งขัน</b><p>ผลแบ่งสายทั้งสองรุ่นต้องครบและล็อกอย่างเป็นทางการแล้ว จากนั้นติดตั้งตาราง 39 คู่ตามกำหนดการ</p><button class="btn gold" :disabled="busy" @click="installOfficial">ใช้ตารางทางการ 39 คู่</button></div>
 
       <section v-else class="match-table-card">

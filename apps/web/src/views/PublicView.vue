@@ -3,7 +3,7 @@ import {computed,onMounted} from 'vue'
 import GroupCard from '../components/GroupCard.vue'
 import TopBar from '../components/TopBar.vue'
 import {useTournamentStore} from '../stores/tournament'
-import type {OfficialScheduleEntry} from '../lib/types'
+import type {DivisionKey,OfficialScheduleEntry} from '../lib/types'
 const s=useTournamentStore()
 const results=computed(()=>s.matches.filter(match=>match.status==='FINISHED').slice(-8).reverse())
 const scheduleDays=computed(()=>{
@@ -15,12 +15,13 @@ const dateTitle=(date:string)=>new Date(`${date}T12:00:00+07:00`).toLocaleDateSt
 const timeOnly=(value:string)=>new Date(value).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Bangkok'})
 const stageTitle=(entry:OfficialScheduleEntry)=>entry.stage==='GROUP'?`สาย ${entry.groupLabel}`:entry.stage==='QF'?`รอบ 8 ทีม ${entry.groupLabel}`:entry.stage==='SF'?'รอบรองชนะเลิศ':entry.stage==='FINAL'?'รอบชิงชนะเลิศ':'คู่พิเศษ'
 const lunchBefore=(entries:OfficialScheduleEntry[],index:number)=>index>0&&new Date(entries[index].startsAt).getTime()-new Date(entries[index-1].endsAt).getTime()>=60*60_000
+const selectDivision=(key:DivisionKey)=>key!==s.divisionKey&&s.setDivision(key)
 onMounted(()=>{s.connect();Promise.all([s.loadState(),s.loadTournament(),s.loadOfficialSchedule()])})
 </script>
 
 <template>
   <div class="public-page"><TopBar/>
-    <header class="public-hero"><div class="cup">🏆</div><div><small>OFFICIAL TOURNAMENT CENTER</small><h1>ฟุตบอลเฉลิมพระเกียรติ</h1><p>ครั้งที่ 13/2569 • ตารางแข่งขันอย่างเป็นทางการ</p></div><select v-model="s.divisionKey" @change="s.setDivision(s.divisionKey)"><option value="PUBLIC">ผลแบ่งสายรุ่นประชาชน</option><option value="SENIOR40">ผลแบ่งสายรุ่นอาวุโส 40+</option></select></header>
+    <header class="public-hero"><div class="cup">🏆</div><div><small>OFFICIAL TOURNAMENT CENTER</small><h1>ฟุตบอลเฉลิมพระเกียรติ</h1><p>ครั้งที่ 13/2569 • ตารางแข่งขันอย่างเป็นทางการ</p></div><div class="public-division-switch" role="group" aria-label="เลือกผลแบ่งสาย"><small>เลือกผลแบ่งสาย</small><div><button :class="{active:s.divisionKey==='PUBLIC'}" :aria-pressed="s.divisionKey==='PUBLIC'" @click="selectDivision('PUBLIC')"><span>รุ่นประชาชน</span><small>ภายในอำเภอปลาปาก</small></button><button :class="{active:s.divisionKey==='SENIOR40'}" :aria-pressed="s.divisionKey==='SENIOR40'" @click="selectDivision('SENIOR40')"><span>รุ่นอาวุโส 40+</span><small>OPEN</small></button></div></div></header>
     <main class="public-content">
       <section><div class="section-title"><h2>ผลแบ่งสาย — {{s.division.name}}</h2><span>OFFICIAL</span></div><div class="group-grid"><GroupCard name="A" :teams="s.groups.A"/><GroupCard name="B" :teams="s.groups.B"/><GroupCard name="C" :teams="s.groups.C"/><GroupCard name="D" :teams="s.groups.D"/></div></section>
 

@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest'
-import {logoExtension,storedLogoPath} from '../uploads.js'
+import {logoExtension,resolveUploadRoot,storedLogoPath} from '../uploads.js'
 
 describe('team logo upload validation',()=>{
   it('detects supported image signatures instead of trusting the filename',()=>{
@@ -13,5 +13,11 @@ describe('team logo upload validation',()=>{
     expect(storedLogoPath('/srv/uploads','/uploads/team-logos/550e8400-e29b-41d4-a716-446655440000.png')).toMatch(/team-logos/)
     expect(storedLogoPath('/srv/uploads','/uploads/team-logos/../../secret.png')).toBeNull()
     expect(storedLogoPath('/srv/uploads','https://example.com/logo.png')).toBeNull()
+  })
+
+  it('normalizes quoted and escaped-quoted upload directories',()=>{
+    expect(resolveUploadRoot('"/srv/team-logos"','/app')).toBe('/srv/team-logos')
+    expect(resolveUploadRoot('\\"/srv/team-logos\\"','/app')).toBe('/srv/team-logos')
+    expect(resolveUploadRoot(undefined,'/app')).toBe('/app/uploads')
   })
 })

@@ -30,6 +30,7 @@ export const useTournamentStore=defineStore('tournament',{
       this.socket.on('draw:settling',(event:DrawSettleEvent)=>{if(event.divisionKey===this.divisionKey&&this.spinActive){this.spinTargetTeamId=event.targetTeamId;this.spinSettleDurationMs=event.durationMs}})
       this.socket.on('draw:state',(state:DrawState)=>{if(state.divisionKey===this.divisionKey)this.applyState(state)})
       this.socket.on('tournament:update',(state:any)=>{if(state.divisionKey===this.divisionKey){this.matches=state.matches||[];this.standings=state.standings||this.standings}})
+      this.socket.on('schedule:update',(entries:OfficialScheduleEntry[])=>{this.scheduleEntries=entries||[]})
       this.socket.on('server:error',(error:{message:string})=>{this.lastError=error.message})
     },
     async loadState(){this.applyState(await json(await fetch(`${api}/api/draw/${this.divisionKey}`)))},

@@ -87,7 +87,7 @@ integration('Prisma/MySQL draw and match persistence',()=>{
   })
 
   it('installs and links the complete 39-match official timetable atomically',async()=>{
-    const {drawAll,resetDraw,setDrawLock}=await import('../drawService.js')
+    const {drawAll,resetDraw,setDrawLock,updateTeamLogo}=await import('../drawService.js')
     const {installOfficialSchedule,listOfficialSchedule}=await import('../officialSchedule.js')
     const {updateMatch}=await import('../tournamentEngine.js')
     const {prisma}=await import('../../db.js')
@@ -110,6 +110,9 @@ integration('Prisma/MySQL draw and match persistence',()=>{
     expect(installed.find(item=>item.sequenceNo===38)?.home.name).toBe('Vip หมออลงกต')
     expect(await prisma.match.count()).toBe(24)
     expect(await prisma.scheduleEntry.count()).toBe(39)
+    const publicLogo='/uploads/team-logos/00000000-0000-4000-8000-000000000001.png'
+    await updateTeamLogo('PUBLIC','p3',publicLogo,{actor:'integration-test'})
+    expect((await listOfficialSchedule())[0].home.logoUrl).toBe(publicLogo)
     const first=installed[0]
     await updateMatch('PUBLIC',first.matchId!,{homeScore:1,awayScore:0,status:'FINISHED'},{actor:'integration-test'})
     expect((await listOfficialSchedule())[0]).toMatchObject({homeScore:1,awayScore:0,status:'FINISHED'})

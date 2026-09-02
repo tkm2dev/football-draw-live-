@@ -14,7 +14,7 @@ import {commitPlannedDraw,drawAll,getDrawState,planNextDraw,resetDraw,setDrawLoc
 import {advanceKnockout,generateGroupMatches,generateKnockout,listMatches,standings,summary,updateMatch,updateMatchSchedule} from './services/tournamentEngine.js'
 import {installOfficialSchedule,listOfficialSchedule,updateStandaloneScheduleResult} from './services/officialSchedule.js'
 import type {DivisionKey} from './services/drawEngine.js'
-import {logoExtension,MAX_LOGO_BYTES,storedLogoPath} from './uploads.js'
+import {logoExtension,MAX_LOGO_BYTES,resolveUploadRoot,storedLogoPath} from './uploads.js'
 
 const app=express()
 app.set('trust proxy',1)
@@ -24,7 +24,8 @@ const corsOptions:cors.CorsOptions={origin:(origin,callback)=>callback(null,!ori
 const io=new Server(server,{cors:corsOptions})
 app.use(cors(corsOptions))
 app.use(express.json({limit:'2mb'}))
-const uploadRoot=path.resolve(process.env.UPLOAD_DIR||path.join(process.cwd(),'uploads'))
+const uploadRoot=resolveUploadRoot(process.env.UPLOAD_DIR)
+await mkdir(path.join(uploadRoot,'team-logos'),{recursive:true})
 const logoUpload=multer({storage:multer.memoryStorage(),limits:{fileSize:MAX_LOGO_BYTES,files:1}})
 app.use('/uploads',express.static(uploadRoot,{dotfiles:'deny',fallthrough:true,maxAge:'30d',immutable:true}))
 
@@ -42,9 +43,10 @@ const context=(req:Request):AuditContext=>({actor:String(req.header('x-admin-use
 const ensureNotSpinning=(key:DivisionKey)=>{if(spinningDivisions.has(key))throw new Error('กรุณารอวงล้อหยุดก่อนทำรายการถัดไป')}
 
 async function emit(key:DivisionKey,state?:Awaited<ReturnType<typeof getDrawState>>){
-  const nextState=state??await getDrawState(key)
+  const [nextState,tournament,schedule]=await Promise.all([state??getDrawState(key),summary(key),listOfficialSchedule()])
   io.to(`division:${key}`).emit('draw:state',nextState)
-  io.to(`division:${key}`).emit('tournament:update',await summary(key))
+  io.to(`division:${key}`).emit('tournament:update',tournament)
+  io.emit('schedule:update',schedule)
 }
 
 app.get('/api/health',route(async(_req,res)=>{

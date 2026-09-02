@@ -38,12 +38,12 @@ PORT=3140
 DATABASE_URL="mysql://football_draw_app:URL_ENCODED_PASSWORD@10.10.30.96:3306/football_draw_live"
 WEB_ORIGIN="https://football.siteams.com"
 # Recommended on the VPS so uploads remain separate from application releases.
-UPLOAD_DIR="C:/ProgramData/football-draw-live/uploads"
+UPLOAD_DIR=C:/ProgramData/football-draw-live/uploads
 ```
 
 The MySQL password in `DATABASE_URL` must be URL encoded. Keep this file off Git.
 
-Team logos are stored as files under `UPLOAD_DIR\team-logos`; the database stores their public paths and audit history. If `UPLOAD_DIR` is omitted, the app uses `apps/api/uploads`. Keep this directory outside Git, preserve it during code updates, and include it in the VPS backup policy together with the MySQL database. Uploads accept PNG, JPG and WebP files up to 5 MB.
+Team logos are stored as files under `UPLOAD_DIR\team-logos`; the database stores their public paths and audit history. Do not add backslashes before quotes in this value. If `UPLOAD_DIR` is omitted, the app uses `apps/api/uploads`. Keep this directory outside Git, preserve it during code updates, and include it in the VPS backup policy together with the MySQL database. Uploads accept PNG, JPG and WebP files up to 5 MB.
 
 ## 2. Create database on `.96`
 

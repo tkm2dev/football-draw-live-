@@ -18,6 +18,7 @@ const slotMinutes=ref(40)
 const defaultField=ref('สนามกลาง')
 const logoEditor=ref(false)
 const uploadingCode=ref('')
+const draggingCode=ref('')
 const groupCodes:GroupCode[]=['A','B','C','D']
 const finishedCount=computed(()=>s.groupMatches.filter(match=>match.status==='FINISHED').length)
 const officialDays=computed(()=>{
@@ -71,12 +72,32 @@ async function saveResult(draft:MatchDraft){
     syncDrafts();message.value=`บันทึกผลสาย ${draft.group} นัดที่ ${draft.round} แล้ว`;messageType.value='ok'
   }catch(error){message.value=error instanceof Error?error.message:'บันทึกผลไม่สำเร็จ';messageType.value='error'}finally{busyMatch.value=''}
 }
+async function uploadLogoFile(code:string,file:File,input?:HTMLInputElement){
+  if(!file)return
+  if(file.size>5*1024*1024){message.value='ไฟล์โลโก้ต้องไม่เกิน 5 MB';messageType.value='error';if(input)input.value='';return}
+  if(uploadingCode.value){message.value='กรุณารอให้อัปโหลดไฟล์ปัจจุบันเสร็จก่อน';messageType.value='error';return}
+  uploadingCode.value=code;message.value=''
+  try{await s.uploadTeamLogo(code,file);await Promise.all([s.loadTournament(),s.loadOfficialSchedule()]);syncDrafts();message.value=`อัปเดตโลโก้ ${team(code)?.name??'ทีม'} แล้ว`;messageType.value='ok'}catch(error){message.value=error instanceof Error?error.message:'อัปโหลดโลโก้ไม่สำเร็จ';messageType.value='error'}finally{uploadingCode.value='';if(input)input.value=''}
+}
 async function uploadLogo(code:string,event:Event){
   const input=event.target as HTMLInputElement,file=input.files?.[0]
-  if(!file)return
-  if(file.size>5*1024*1024){message.value='ไฟล์โลโก้ต้องไม่เกิน 5 MB';messageType.value='error';input.value='';return}
-  uploadingCode.value=code;message.value=''
-  try{await s.uploadTeamLogo(code,file);await s.loadTournament();syncDrafts();message.value='อัปเดตโลโก้ทีมแล้ว';messageType.value='ok'}catch(error){message.value=error instanceof Error?error.message:'อัปโหลดโลโก้ไม่สำเร็จ';messageType.value='error'}finally{uploadingCode.value='';input.value=''}
+  if(file)await uploadLogoFile(code,file,input)
+}
+function dragLogo(code:string,event:DragEvent){
+  if(uploadingCode.value)return
+  draggingCode.value=code
+  if(event.dataTransfer)event.dataTransfer.dropEffect='copy'
+}
+function leaveLogo(code:string,event:DragEvent){
+  const card=event.currentTarget as HTMLElement|null,related=event.relatedTarget
+  if(card&&related instanceof Node&&card.contains(related))return
+  if(draggingCode.value===code)draggingCode.value=''
+}
+async function dropLogo(code:string,event:DragEvent){
+  draggingCode.value=''
+  const file=event.dataTransfer?.files?.[0]
+  if(!file){message.value='ไม่พบไฟล์ภาพที่ลากมาวาง';messageType.value='error';return}
+  await uploadLogoFile(code,file)
 }
 
 onMounted(async()=>{s.connect();await Promise.all([s.loadState(),s.loadTournament(),s.loadOfficialSchedule()]);syncDrafts()})
@@ -99,8 +120,8 @@ onMounted(async()=>{s.connect();await Promise.all([s.loadState(),s.loadTournamen
       </section>
 
       <section v-if="logoEditor" class="match-logo-editor">
-        <header><div><div class="eyebrow">TEAM BRANDING</div><h2>โลโก้ทีม — {{s.division.name}}</h2></div><button class="editor-close" @click="logoEditor=false">×</button></header>
-        <div class="match-logo-grid"><label v-for="item in s.teams" :key="item.id" class="match-logo-item"><span><img v-if="item.logoUrl" :src="item.logoUrl" :alt="`โลโก้ ${item.name}`"><b v-else>{{initials(item.name)}}</b></span><strong>{{item.name}}</strong><em>{{uploadingCode===item.id?'กำลังอัปโหลด...':item.logoUrl?'เปลี่ยนโลโก้':'เพิ่มโลโก้'}}</em><input type="file" accept="image/png,image/jpeg,image/webp" :disabled="Boolean(uploadingCode)" @change="uploadLogo(item.id,$event)"></label></div>
+        <header><div><div class="eyebrow">TEAM BRANDING</div><h2>โลโก้ทีม — {{s.division.name}}</h2><p>คลิกการ์ดเพื่อเลือกไฟล์ หรือลากไฟล์โลโก้มาวางบนทีมที่ต้องการ • PNG, JPG, WebP ไม่เกิน 5 MB</p></div><button class="editor-close" @click="logoEditor=false">×</button></header>
+        <div class="match-logo-grid"><label v-for="item in s.teams" :key="item.id" :class="['match-logo-item',{dragging:draggingCode===item.id,uploading:uploadingCode===item.id}]" @dragenter.prevent="dragLogo(item.id,$event)" @dragover.prevent="dragLogo(item.id,$event)" @dragleave.prevent="leaveLogo(item.id,$event)" @drop.prevent="dropLogo(item.id,$event)"><span><img v-if="item.logoUrl" :src="item.logoUrl" :alt="`โลโก้ ${item.name}`"><b v-else>{{initials(item.name)}}</b></span><strong>{{item.name}}</strong><em>{{uploadingCode===item.id?'กำลังอัปโหลด...':item.logoUrl?'ลากวางหรือคลิกเพื่อเปลี่ยน':'ลากวางหรือคลิกเพื่อเพิ่ม'}}</em><div v-if="draggingCode===item.id" class="logo-drop-overlay"><b>วางไฟล์ที่นี่</b><small>อัปเดตโลโก้ {{item.name}}</small></div><input type="file" accept="image/png,image/jpeg,image/webp" :aria-label="`อัปโหลดโลโก้ ${item.name}`" :disabled="Boolean(uploadingCode)" @change="uploadLogo(item.id,$event)"></label></div>
       </section>
 
       <section v-if="officialDays.length" class="official-schedule-card">

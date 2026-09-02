@@ -3,7 +3,7 @@ export type GroupCode='A'|'B'|'C'|'D'
 export interface Team{id:string;name:string;seed?:boolean;logoUrl?:string}
 export interface GroupMap{A:Team[];B:Team[];C:Team[];D:Team[]}
 export interface Division{key:DivisionKey;name:string;subtitle:string;teams:Team[]}
-export interface Match{id:string;divisionKey?:DivisionKey;stage:'GROUP'|'QF'|'SF'|'FINAL';group?:GroupCode;home:Team;away:Team;round:number;homeScore:number|null;awayScore:number|null;status:'SCHEDULED'|'LIVE'|'FINISHED';kickoffAt?:string|null;field?:string}
+export interface Match{id:string;sequenceNo?:number;divisionKey?:DivisionKey;stage:'GROUP'|'QF'|'SF'|'FINAL';group?:GroupCode;home:Team;away:Team;round:number;homeScore:number|null;awayScore:number|null;status:'SCHEDULED'|'LIVE'|'FINISHED';kickoffAt?:string|null;field?:string}
 export interface OfficialScheduleEntry{id:string;sequenceNo:number;divisionKey:DivisionKey|null;categoryLabel:string;stage:'GROUP'|'QF'|'SF'|'FINAL'|'SPECIAL';groupLabel:string|null;startsAt:string;endsAt:string;home:{id?:string;name:string;logoUrl?:string};away:{id?:string;name:string;logoUrl?:string};homeScore:number|null;awayScore:number|null;status:'SCHEDULED'|'LIVE'|'FINISHED';field:string;matchId:string|null}
 export interface Standing{team:Team;p:number;w:number;d:number;l:number;gf:number;ga:number;gd:number;pts:number;rank:number}
 export interface DrawEvent{id:string;at:string;eventType:string;message:string;team?:Team;group?:GroupCode;actor?:string}

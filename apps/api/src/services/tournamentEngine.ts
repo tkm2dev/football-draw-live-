@@ -3,13 +3,13 @@ import {prisma} from '../db.js'
 import {GROUP_CODES,type DivisionKey,type GroupCode} from './drawEngine.js'
 import type {ApiTeam,AuditContext} from './drawService.js'
 
-export type Match={id:string;divisionKey:DivisionKey;stage:'GROUP'|'QF'|'SF'|'FINAL';group?:GroupCode;round:number;home:ApiTeam;away:ApiTeam;homeScore:number|null;awayScore:number|null;status:'SCHEDULED'|'LIVE'|'FINISHED';kickoffAt:string|null;field:string}
+export type Match={id:string;sequenceNo?:number;divisionKey:DivisionKey;stage:'GROUP'|'QF'|'SF'|'FINAL';group?:GroupCode;round:number;home:ApiTeam;away:ApiTeam;homeScore:number|null;awayScore:number|null;status:'SCHEDULED'|'LIVE'|'FINISHED';kickoffAt:string|null;field:string}
 export type Standing={team:ApiTeam;p:number;w:number;d:number;l:number;gf:number;ga:number;gd:number;pts:number;rank:number}
 type Tx=Prisma.TransactionClient
-type MatchRow=Prisma.MatchGetPayload<{include:{home:true,away:true}}>
+type MatchRow=Prisma.MatchGetPayload<{include:{home:true,away:true,scheduleEntry:true}}>
 
 const apiTeam=(team:{code:string;name:string;isSeed:boolean;logoUrl:string|null}):ApiTeam=>({id:team.code,name:team.name,seed:team.isSeed,logoUrl:team.logoUrl??undefined})
-const matchView=(divisionKey:DivisionKey,row:MatchRow):Match=>({id:String(row.id),divisionKey,stage:row.stage,group:row.groupCode as GroupCode|undefined,round:row.round,home:apiTeam(row.home),away:apiTeam(row.away),homeScore:row.homeScore,awayScore:row.awayScore,status:row.status,kickoffAt:row.kickoffAt?.toISOString()??null,field:row.field??'สนามกลาง'})
+const matchView=(divisionKey:DivisionKey,row:MatchRow):Match=>({id:String(row.id),sequenceNo:row.scheduleEntry?.sequenceNo,divisionKey,stage:row.stage,group:row.groupCode as GroupCode|undefined,round:row.round,home:apiTeam(row.home),away:apiTeam(row.away),homeScore:row.homeScore,awayScore:row.awayScore,status:row.status,kickoffAt:row.kickoffAt?.toISOString()??null,field:row.field??'สนามกลาง'})
 
 async function division(tx:Tx,key:DivisionKey){
   const row=await tx.division.findFirst({where:{type:key as DivisionType},orderBy:{tournamentId:'desc'},include:{teams:{orderBy:{sortOrder:'asc'}},groups:{orderBy:{code:'asc'},include:{teams:{orderBy:{drawOrder:'asc'},include:{team:true}}}}}})
@@ -22,7 +22,7 @@ async function audit(tx:Tx,divisionId:number,entityType:string,entityId:string,a
 }
 
 async function matchRows(tx:Tx,divisionId:number){
-  return tx.match.findMany({where:{divisionId},orderBy:[{stage:'asc'},{groupCode:'asc'},{round:'asc'},{id:'asc'}],include:{home:true,away:true}})
+  return tx.match.findMany({where:{divisionId},orderBy:[{stage:'asc'},{groupCode:'asc'},{round:'asc'},{id:'asc'}],include:{home:true,away:true,scheduleEntry:true}})
 }
 
 function tableFor(groups:Awaited<ReturnType<typeof division>>['groups'],matches:MatchRow[]):Record<GroupCode,Standing[]>{
@@ -138,7 +138,7 @@ export async function updateMatch(key:DivisionKey,id:string,patch:MatchPatch,con
     const nextStatus=patch.status??(nextHome!==null&&nextHome!==undefined&&nextAway!==null&&nextAway!==undefined?'FINISHED':existing.status)
     if(nextStatus==='FINISHED'&&(nextHome===null||nextHome===undefined||nextAway===null||nextAway===undefined))throw new Error('กรุณากรอกสกอร์ทั้งสองทีมก่อนยืนยันผลการแข่งขัน')
     if(!patch.status&&nextHome!==null&&nextHome!==undefined&&nextAway!==null&&nextAway!==undefined)data.status=MatchStatus.FINISHED
-    const updated=await tx.match.update({where:{id:numericId},data,include:{home:true,away:true}})
+    const updated=await tx.match.update({where:{id:numericId},data,include:{home:true,away:true,scheduleEntry:true}})
     const schedule=await tx.scheduleEntry.findUnique({where:{matchId:numericId}})
     if(schedule){
       const scheduleData:Prisma.ScheduleEntryUpdateInput={homeScore:updated.homeScore,awayScore:updated.awayScore,status:updated.status,field:updated.field}

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed,onMounted,ref,watch} from 'vue'
+import {computed,onBeforeUnmount,onMounted,ref,watch} from 'vue'
 import TopBar from '../components/TopBar.vue'
 import {useTournamentStore} from '../stores/tournament'
 import type {GroupCode,Match,OfficialScheduleEntry,Team} from '../lib/types'
@@ -19,6 +19,7 @@ const defaultField=ref('สนามกลาง')
 const logoEditor=ref(false)
 const uploadingCode=ref('')
 const draggingCode=ref('')
+const pasteTargetCode=ref('')
 const groupCodes:GroupCode[]=['A','B','C','D']
 const finishedCount=computed(()=>s.groupMatches.filter(match=>match.status==='FINISHED').length)
 const officialDays=computed(()=>{
@@ -99,8 +100,18 @@ async function dropLogo(code:string,event:DragEvent){
   if(!file){message.value='ไม่พบไฟล์ภาพที่ลากมาวาง';messageType.value='error';return}
   await uploadLogoFile(code,file)
 }
+async function pasteLogo(event:ClipboardEvent){
+  if(!logoEditor.value||!pasteTargetCode.value||uploadingCode.value)return
+  const items=Array.from(event.clipboardData?.items??[])
+  const imageItem=items.find(item=>item.kind==='file'&&item.type.startsWith('image/'))
+  const file=imageItem?.getAsFile()??Array.from(event.clipboardData?.files??[]).find(item=>item.type.startsWith('image/'))
+  if(!file){message.value='ใน Clipboard ไม่มีไฟล์ภาพ กรุณาคัดลอกรูปก่อนแล้วลองวางใหม่';messageType.value='error';return}
+  event.preventDefault()
+  await uploadLogoFile(pasteTargetCode.value,file)
+}
 
-onMounted(async()=>{s.connect();await Promise.all([s.loadState(),s.loadTournament(),s.loadOfficialSchedule()]);syncDrafts()})
+onMounted(async()=>{window.addEventListener('paste',pasteLogo);s.connect();await Promise.all([s.loadState(),s.loadTournament(),s.loadOfficialSchedule()]);syncDrafts()})
+onBeforeUnmount(()=>window.removeEventListener('paste',pasteLogo))
 </script>
 
 <template>
@@ -120,8 +131,8 @@ onMounted(async()=>{s.connect();await Promise.all([s.loadState(),s.loadTournamen
       </section>
 
       <section v-if="logoEditor" class="match-logo-editor">
-        <header><div><div class="eyebrow">TEAM BRANDING</div><h2>โลโก้ทีม — {{s.division.name}}</h2><p>คลิกการ์ดเพื่อเลือกไฟล์ หรือลากไฟล์โลโก้มาวางบนทีมที่ต้องการ • PNG, JPG, WebP ไม่เกิน 5 MB</p></div><button class="editor-close" @click="logoEditor=false">×</button></header>
-        <div class="match-logo-grid"><label v-for="item in s.teams" :key="item.id" :class="['match-logo-item',{dragging:draggingCode===item.id,uploading:uploadingCode===item.id}]" @dragenter.prevent="dragLogo(item.id,$event)" @dragover.prevent="dragLogo(item.id,$event)" @dragleave.prevent="leaveLogo(item.id,$event)" @drop.prevent="dropLogo(item.id,$event)"><span><img v-if="item.logoUrl" :src="item.logoUrl" :alt="`โลโก้ ${item.name}`"><b v-else>{{initials(item.name)}}</b></span><strong>{{item.name}}</strong><em>{{uploadingCode===item.id?'กำลังอัปโหลด...':item.logoUrl?'ลากวางหรือคลิกเพื่อเปลี่ยน':'ลากวางหรือคลิกเพื่อเพิ่ม'}}</em><div v-if="draggingCode===item.id" class="logo-drop-overlay"><b>วางไฟล์ที่นี่</b><small>อัปเดตโลโก้ {{item.name}}</small></div><input type="file" accept="image/png,image/jpeg,image/webp" :aria-label="`อัปโหลดโลโก้ ${item.name}`" :disabled="Boolean(uploadingCode)" @change="uploadLogo(item.id,$event)"></label></div>
+        <header><div><div class="eyebrow">TEAM BRANDING</div><h2>โลโก้ทีม — {{s.division.name}}</h2><p>คลิกเลือกไฟล์ ลากไฟล์มาวาง หรือชี้เมาส์บนทีมแล้วกด Ctrl+V / ⌘+V เพื่อวางรูปจาก Clipboard • PNG, JPG, WebP ไม่เกิน 5 MB</p></div><button class="editor-close" @click="logoEditor=false">×</button></header>
+        <div class="match-logo-grid"><label v-for="item in s.teams" :key="item.id" tabindex="0" :class="['match-logo-item',{dragging:draggingCode===item.id,uploading:uploadingCode===item.id,'paste-target':pasteTargetCode===item.id}]" @mouseenter="pasteTargetCode=item.id" @mouseleave="pasteTargetCode===item.id&&(pasteTargetCode='')" @focusin="pasteTargetCode=item.id" @focusout="pasteTargetCode===item.id&&(pasteTargetCode='')" @dragenter.prevent="dragLogo(item.id,$event)" @dragover.prevent="dragLogo(item.id,$event)" @dragleave.prevent="leaveLogo(item.id,$event)" @drop.prevent="dropLogo(item.id,$event)"><span><img v-if="item.logoUrl" :src="item.logoUrl" :alt="`โลโก้ ${item.name}`"><b v-else>{{initials(item.name)}}</b></span><strong>{{item.name}}</strong><em>{{uploadingCode===item.id?'กำลังอัปโหลด...':pasteTargetCode===item.id?'พร้อมวางรูปด้วย Ctrl+V / ⌘+V':item.logoUrl?'ลาก วาง หรือคลิกเพื่อเปลี่ยน':'ลาก วาง หรือคลิกเพื่อเพิ่ม'}}</em><div v-if="draggingCode===item.id" class="logo-drop-overlay"><b>วางไฟล์ที่นี่</b><small>อัปเดตโลโก้ {{item.name}}</small></div><input type="file" accept="image/png,image/jpeg,image/webp" :aria-label="`อัปโหลดโลโก้ ${item.name}`" :disabled="Boolean(uploadingCode)" @change="uploadLogo(item.id,$event)"></label></div>
       </section>
 
       <section v-if="officialDays.length" class="official-schedule-card">

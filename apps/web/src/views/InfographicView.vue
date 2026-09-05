@@ -42,7 +42,13 @@ onMounted(async()=>{
   <div :class="['infographic-page',{exporting:exportMode}]">
     <header class="infographic-toolbar">
       <div><RouterLink to="/matches">← กลับหน้าตารางแข่งขัน</RouterLink><h1>ภาพประชาสัมพันธ์รายวัน</h1><p>เลือกวันที่เพื่อดูโปรแกรมในรูปแบบโปสเตอร์</p></div>
-      <nav aria-label="เลือกวันแข่งขัน"><button v-for="date in dates" :key="date" :class="{active:selectedDate===date}" type="button" @click="selectedDate=date">{{shortDate(date)}}</button></nav>
+      <div class="infographic-tools">
+        <nav aria-label="เลือกวันแข่งขัน"><button v-for="date in dates" :key="date" :class="{active:selectedDate===date}" type="button" @click="selectedDate=date">{{shortDate(date)}}</button></nav>
+        <div v-if="selectedDate==='2026-09-06'" class="infographic-downloads">
+          <a href="/infographics/program-2026-09-06-landscape.png" target="_blank" rel="noopener">เปิดโปสเตอร์แนวนอน</a>
+          <a href="/downloads/team-logos-20-teams.zip" download>ดาวน์โหลดโลโก้ 20 ทีม</a>
+        </div>
+      </div>
     </header>
 
     <main class="infographic-preview">

@@ -30,8 +30,16 @@ const shortDate=(value:string)=>new Date(`${value}T12:00:00+07:00`).toLocaleDate
 const time=(value:string)=>new Date(value).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone})
 const initials=(name:string)=>name.trim().split(/\s+/).map(part=>part[0]).join('').slice(0,2).toUpperCase()
 const divisionClass=(entry:OfficialScheduleEntry)=>entry.divisionKey==='SENIOR40'?'senior':'public'
+const groupClass=(entry:OfficialScheduleEntry)=>`group-${(entry.groupLabel||'other').toLowerCase()}`
+const breakAfter=(index:number)=>{
+  const current=matches.value[index]
+  const next=matches.value[index+1]
+  if(!current||!next)return ''
+  const gap=new Date(next.startsAt).getTime()-new Date(current.endsAt).getTime()
+  return gap>=45*60*1000?`${time(current.endsAt)}–${time(next.startsAt)} น.`:''
+}
 
-watch(selectedDate,date=>router.replace({query:{date}}))
+watch(selectedDate,date=>router.replace({query:{...route.query,date}}))
 onMounted(async()=>{
   await s.loadOfficialSchedule()
   if(!dates.value.includes(selectedDate.value)&&dates.value.length)selectedDate.value=dates.value[0]
@@ -52,36 +60,49 @@ onMounted(async()=>{
     </header>
 
     <main class="infographic-preview">
-      <article id="matchday-poster" class="matchday-poster">
+      <article id="matchday-poster" :class="['matchday-poster',{dense:matches.length>8}]">
         <div class="poster-glow one"></div><div class="poster-glow two"></div>
-        <header class="poster-header">
-          <TournamentCrest/>
-          <div class="poster-event"><small>FOOTBALL TOURNAMENT • MATCHDAY 01</small><b>การแข่งขันฟุตบอลเฉลิมพระเกียรติ</b><span>ครั้งที่ 13/2569 • อำเภอปลาปาก</span></div>
-          <div class="poster-live"><i></i> OFFICIAL</div>
+        <header class="poster-hero">
+          <div class="poster-ball" aria-hidden="true">⚽</div>
+          <div class="poster-event">
+            <small>ตารางการแข่งขันฟุตบอล</small>
+            <b>เฉลิมพระเกียรติ ครั้งที่</b>
+            <strong>13</strong>
+          </div>
+          <div class="poster-royal">
+            <TournamentCrest/>
+            <span>ด้วยสำนึกในพระมหากรุณาธิคุณ</span>
+            <b>“กีฬา สร้างคน สร้างสังคม”</b>
+            <small>ปลาปาก...ร่วมใจ สู่อนาคตที่ดีกว่า</small>
+          </div>
+          <div class="poster-date"><b>{{posterDate}}</b></div>
+          <div class="poster-location"><span>●</span> สนามฟุตบอล อ.ปลาปาก จ.นครพนม</div>
         </header>
 
-        <section class="poster-title">
-          <div><span></span><b>โปรแกรมการแข่งขัน</b><span></span></div>
-          <h2>{{posterDate}}</h2>
-          <p>{{matches.length}} MATCHES • 2 DIVISIONS • ONE GREAT DAY</p>
-        </section>
+        <div class="poster-table-head" aria-hidden="true">
+          <b>คู่ที่</b><b>รุ่น</b><b>สาย</b><b>เวลา</b><b>ทีมแข่งขัน</b>
+        </div>
 
         <section class="poster-schedule">
           <template v-for="(entry,index) in matches" :key="entry.id">
-            <div v-if="index===2" class="poster-break"><span></span><b>พักเที่ยง • 11:40–13:00 น.</b><span></span></div>
             <article :class="['promo-match',divisionClass(entry)]">
-              <div class="promo-time"><small>คู่ที่ {{entry.sequenceNo}}</small><b>{{time(entry.startsAt)}}</b><span>{{time(entry.endsAt)}} น.</span></div>
-              <div class="promo-class"><b>{{entry.categoryLabel}}</b><span>สาย {{entry.groupLabel}}</span></div>
+              <div class="promo-number">{{entry.sequenceNo}}</div>
+              <div class="promo-class"><b>{{entry.categoryLabel}}</b></div>
+              <div :class="['promo-group',groupClass(entry)]">{{entry.groupLabel||'—'}}</div>
+              <div class="promo-time"><b>{{time(entry.startsAt)}} - {{time(entry.endsAt)}}</b></div>
               <div class="promo-team home"><strong>{{entry.home.name}}</strong><i><img v-if="entry.home.logoUrl" :src="entry.home.logoUrl" :alt="`โลโก้ ${entry.home.name}`"><em v-else>{{initials(entry.home.name)}}</em></i></div>
               <div class="promo-vs"><small>VS</small></div>
               <div class="promo-team away"><i><img v-if="entry.away.logoUrl" :src="entry.away.logoUrl" :alt="`โลโก้ ${entry.away.name}`"><em v-else>{{initials(entry.away.name)}}</em></i><strong>{{entry.away.name}}</strong></div>
             </article>
+            <div v-if="breakAfter(index)" class="poster-break"><span></span><b>พักเที่ยง <small>{{breakAfter(index)}}</small></b><span></span></div>
           </template>
         </section>
 
         <footer class="poster-footer">
-          <div class="poster-organizers"><span v-for="item in organizerLogos" :key="item.name"><i><img :src="item.logo" :alt="`โลโก้ ${item.name}`"></i><b>{{item.name}}</b></span></div>
-          <div class="poster-follow"><small>ติดตามโปรแกรม ตารางคะแนน และผลการแข่งขัน</small><b>football.siteams.com</b></div>
+          <div class="academy-brand"><img src="/assets/organizers/peuan-yaowachon-academy.png" alt="เพื่อนเยาวชน Academy"><b>เพื่อนเยาวชน <em>ACADEMY</em></b></div>
+          <div class="poster-motto"><b>“มากกว่าการแข่งขัน คือ...มิตรภาพ”</b><span>FOOTBALL FOR A BETTER TOMORROW</span></div>
+          <div class="poster-follow"><b>football.siteams.com</b><span>อ.ปลาปาก จ.นครพนม</span></div>
+          <div class="poster-organizers"><span v-for="item in organizerLogos" :key="item.name"><img :src="item.logo" :alt="`โลโก้ ${item.name}`"></span></div>
         </footer>
       </article>
     </main>

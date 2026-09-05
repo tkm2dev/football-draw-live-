@@ -103,5 +103,274 @@ body{background:#020817;color:#f8fbff}.premium-page,.draw-control-page,.public-p
 @media(max-width:520px){.rounds-summary>div{padding:10px 8px}.rounds-summary b{font-size:.85rem}.rounds-summary small{font-size:.48rem}.rounds-content{padding-left:14px;padding-right:14px}.rounds-division-switch>div{grid-template-columns:1fr 1fr}.rounds-division-switch button{min-height:60px;padding:8px;text-align:center}.rounds-division-switch button span{font-size:.78rem}.knockout-tree{min-width:850px;grid-template-columns:222px 48px 215px 48px 222px}}
 
 /* Daily promotional infographic */
-.infographic-page{min-height:100vh;padding:28px;background:radial-gradient(circle at 50% 0,#164b92,#06152f 48%,#020817);color:#fff}.infographic-page.exporting{width:2160px;padding:0}.infographic-page.exporting .infographic-toolbar{display:none}.infographic-page.exporting .infographic-preview{max-width:2160px}.infographic-toolbar{max-width:1080px;margin:0 auto 22px;display:flex;align-items:end;justify-content:space-between;gap:24px}.infographic-toolbar a{color:#89bced;font-size:.78rem;font-weight:800}.infographic-toolbar h1{margin:6px 0 0;color:#f5d66b}.infographic-toolbar p{margin:2px 0 0;color:#90afd0}.infographic-toolbar nav{max-width:620px;display:flex;justify-content:flex-end;gap:7px;flex-wrap:wrap}.infographic-toolbar button{padding:9px 12px;border:1px solid #3776b4;border-radius:9px;background:#071b3a;color:#a9c8e6;cursor:pointer}.infographic-toolbar button.active{border-color:#f2ce5d;background:#153967;color:#f6d76b}.infographic-preview{max-width:1080px;margin:auto}.matchday-poster{container-type:inline-size;isolation:isolate;position:relative;width:100%;aspect-ratio:4/5;padding:3.4cqw 4.2cqw 3.1cqw;display:grid;grid-template-rows:8.5cqw 15cqw minmax(0,1fr) 8.8cqw;gap:1.25cqw;border:.22cqw solid #d7b84c;background:linear-gradient(#020b20b8,#031330e8),url('/assets/stadium-trophy-bg.png') center/cover;color:#fff;box-shadow:0 2.4cqw 6cqw #000a,inset 0 0 0 .5cqw #0a3c7a;overflow:hidden}.matchday-poster:before{content:"";position:absolute;z-index:-1;inset:0;background:linear-gradient(90deg,transparent,#1958a728 50%,transparent),radial-gradient(circle at 50% 44%,transparent 0 28%,#01091e7d 72%)}.matchday-poster:after{content:"";position:absolute;z-index:5;inset:1.2cqw;border:.1cqw solid #4b8fd27d;pointer-events:none}.poster-glow{position:absolute;z-index:-1;width:26cqw;height:26cqw;border-radius:50%;background:#107cff45;filter:blur(6cqw)}.poster-glow.one{left:-13cqw;top:12cqw}.poster-glow.two{right:-13cqw;top:9cqw}.poster-header{display:grid;grid-template-columns:7.1cqw 1fr auto;align-items:center;gap:1.5cqw;border-bottom:.1cqw solid #478bd1;padding-bottom:1cqw}.poster-header .tournament-crest{width:6.3cqw;height:6.8cqw;filter:drop-shadow(0 0 1.2cqw #54a5ff)}.poster-event{display:grid}.poster-event small{color:#79baf4;font-size:.74cqw;font-weight:950;letter-spacing:.16em}.poster-event b{font-size:2.15cqw;line-height:1.14}.poster-event span{color:#f1ce62;font-size:1.05cqw;font-weight:850}.poster-live{padding:.62cqw 1cqw;display:flex;align-items:center;gap:.55cqw;border:.1cqw solid #d6b33f;border-radius:2cqw;background:#342b0c99;color:#f7d66b;font-size:.72cqw;font-weight:950;letter-spacing:.15em}.poster-live i{width:.65cqw;height:.65cqw;border-radius:50%;background:#f2c94c;box-shadow:0 0 1cqw #ffe783}.poster-title{display:grid;align-content:center;justify-items:center;text-align:center}.poster-title>div{width:100%;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:1.5cqw}.poster-title>div span{height:.11cqw;background:linear-gradient(90deg,transparent,#e9c650)}.poster-title>div span:last-child{background:linear-gradient(90deg,#e9c650,transparent)}.poster-title>div b{color:#d5ecff;font-size:2.2cqw}.poster-title h2{margin:.25cqw 0;color:#f5d15d;font-size:4.15cqw;line-height:1.08;text-shadow:0 .35cqw .6cqw #000}.poster-title p{margin:.5cqw 0 0;color:#80bdf5;font-size:.72cqw;font-weight:950;letter-spacing:.24em}.poster-schedule{min-height:0;display:grid;grid-template-rows:repeat(2,minmax(0,1fr)) 2.7cqw repeat(6,minmax(0,1fr));gap:.62cqw}.promo-match{position:relative;display:grid;grid-template-columns:8.7cqw 10.2cqw minmax(0,1fr) 4.2cqw minmax(0,1fr);align-items:center;border:.1cqw solid #3c83c8;border-radius:.75cqw;background:linear-gradient(90deg,#071c3ef0,#0b2c5ae8 48%,#071c3ef0);box-shadow:0 .55cqw 1.1cqw #0007;overflow:hidden}.promo-match:before{content:"";position:absolute;inset:0 auto 0 0;width:.35cqw;background:#3198ec}.promo-match.senior{border-color:#b2923e;background:linear-gradient(90deg,#181d34f2,#2b2a36e8 48%,#181d34f2)}.promo-match.senior:before{background:#e1bd4b}.promo-time{height:100%;display:grid;place-content:center;text-align:center;border-right:.1cqw solid #2d679f}.promo-time small{color:#7bb8ee;font-size:.65cqw}.promo-time b{color:#f6d66c;font-size:1.85cqw;line-height:1}.promo-time span{color:#7d9fbe;font-size:.62cqw}.promo-class{display:grid;justify-items:center;text-align:center}.promo-class b{font-size:1.05cqw}.promo-class span{padding:.15cqw .65cqw;border-radius:1cqw;background:#0f4985;color:#bcdfff;font-size:.65cqw;font-weight:900}.senior .promo-class span{background:#6b571a;color:#ffe998}.promo-team{min-width:0;display:grid;align-items:center;gap:.85cqw}.promo-team.home{grid-template-columns:minmax(0,1fr) 5.2cqw;text-align:right}.promo-team.away{grid-template-columns:5.2cqw minmax(0,1fr)}.promo-team i{width:5.2cqw;height:5.3cqw;padding:.25cqw;display:grid;place-items:center;border:.16cqw solid #d8eaff;border-radius:1cqw;background:#f4f8ff;color:#082956;box-shadow:0 0 1cqw #248ee65c;font-style:normal;overflow:hidden}.promo-team img{width:100%;height:100%;object-fit:contain;border-radius:.6cqw}.promo-team em{font-size:.9cqw;font-style:normal;font-weight:950}.promo-team strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:1.46cqw;line-height:1.12}.promo-vs{display:grid;place-items:center}.promo-vs small{width:3.4cqw;height:3.4cqw;display:grid;place-items:center;border:.1cqw solid #e4c34f;border-radius:50%;background:#06152f;color:#f5d36a;font-size:.85cqw;font-weight:950}.poster-break{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:1cqw}.poster-break span{height:.1cqw;background:linear-gradient(90deg,transparent,#e5c14a)}.poster-break span:last-child{background:linear-gradient(90deg,#e5c14a,transparent)}.poster-break b{color:#f1d471;font-size:.8cqw;letter-spacing:.06em}.poster-footer{display:grid;grid-template-columns:1fr auto;align-items:end;gap:2cqw;border-top:.1cqw solid #477fb7;padding-top:.85cqw}.poster-organizers{display:flex;align-items:center;gap:1.2cqw}.poster-organizers>span{display:grid;grid-template-columns:3.4cqw auto;align-items:center;gap:.4cqw}.poster-organizers i{width:3.2cqw;height:3.2cqw;padding:.18cqw;display:grid;place-items:center;border-radius:.55cqw;background:#fff;overflow:hidden}.poster-organizers img{width:100%;height:100%;object-fit:contain}.poster-organizers b{max-width:6.5cqw;font-size:.55cqw;line-height:1.1}.poster-follow{display:grid;text-align:right}.poster-follow small{color:#9fc3e5;font-size:.62cqw}.poster-follow b{color:#f5d46a;font-size:1.35cqw;letter-spacing:.03em}
-.infographic-tools{display:grid;justify-items:end;gap:9px}.infographic-downloads{display:flex;gap:7px}.infographic-downloads a{padding:8px 11px;border:1px solid #cba943;border-radius:9px;background:#4b3b0f;color:#f7d66b}.infographic-downloads a:last-child{border-color:#3979b7;background:#08234a;color:#b9daf7}@media(max-width:760px){.infographic-page{padding:14px}.infographic-toolbar{display:grid}.infographic-tools{justify-items:start}.infographic-toolbar nav{justify-content:flex-start}.infographic-downloads{flex-wrap:wrap}.infographic-toolbar h1{font-size:1.45rem}.infographic-toolbar p{font-size:.78rem}}
+.infographic-page{
+  min-height:100vh;
+  padding:28px;
+  background:radial-gradient(circle at 50% 0,#164b92,#06152f 48%,#020817);
+  color:#fff;
+}
+.infographic-page.exporting{width:3072px;padding:0}
+.infographic-page.exporting .infographic-toolbar{display:none}
+.infographic-page.exporting .infographic-preview{max-width:3072px}
+.infographic-toolbar{
+  max-width:1536px;
+  margin:0 auto 22px;
+  display:flex;
+  align-items:end;
+  justify-content:space-between;
+  gap:24px;
+}
+.infographic-toolbar a{color:#89bced;font-size:.78rem;font-weight:800}
+.infographic-toolbar h1{margin:6px 0 0;color:#f5d66b}
+.infographic-toolbar p{margin:2px 0 0;color:#90afd0}
+.infographic-tools{display:grid;justify-items:end;gap:9px}
+.infographic-toolbar nav{max-width:760px;display:flex;justify-content:flex-end;gap:7px;flex-wrap:wrap}
+.infographic-toolbar button{padding:9px 12px;border:1px solid #3776b4;border-radius:9px;background:#071b3a;color:#a9c8e6;cursor:pointer}
+.infographic-toolbar button.active{border-color:#f2ce5d;background:#153967;color:#f6d76b;box-shadow:0 0 14px #eebd4236}
+.infographic-downloads{display:flex;gap:7px}
+.infographic-downloads a{padding:8px 11px;border:1px solid #cba943;border-radius:9px;background:#4b3b0f;color:#f7d66b}
+.infographic-downloads a:last-child{border-color:#3979b7;background:#08234a;color:#b9daf7}
+.infographic-preview{max-width:1536px;margin:auto}
+
+.matchday-poster{
+  container-type:inline-size;
+  isolation:isolate;
+  position:relative;
+  width:100%;
+  aspect-ratio:3/2;
+  padding:1.15cqw 3cqw;
+  display:grid;
+  grid-template-rows:12.3cqw 3.2cqw minmax(0,1fr) 5.6cqw;
+  gap:.35cqw;
+  border:.16cqw solid #e5bd45;
+  background:
+    linear-gradient(180deg,#020919b3 0,#031333df 20%,#020a1bec 100%),
+    url('/assets/stadium-trophy-bg.png') center/cover;
+  color:#fff;
+  box-shadow:0 2.4cqw 6cqw #000a,inset 0 0 0 .38cqw #0a3c7a;
+  overflow:hidden;
+}
+.matchday-poster:before{
+  content:"";
+  position:absolute;
+  z-index:-1;
+  inset:0;
+  background:
+    radial-gradient(circle at 8% 13%,#ff5a0045 0 5%,transparent 16%),
+    radial-gradient(circle at 92% 11%,#146dff7d 0 4%,transparent 17%),
+    linear-gradient(90deg,#0e4d9b21,transparent 35% 65%,#0e4d9b21);
+}
+.matchday-poster:after{
+  content:"";
+  position:absolute;
+  z-index:5;
+  inset:.55cqw;
+  border:.08cqw solid #4b9be38f;
+  pointer-events:none;
+}
+.poster-glow{position:absolute;z-index:-1;width:22cqw;height:22cqw;border-radius:50%;filter:blur(4cqw)}
+.poster-glow.one{left:-7cqw;top:5cqw;background:#f335163d}
+.poster-glow.two{right:-7cqw;top:2cqw;background:#107cff45}
+
+.poster-hero{
+  position:relative;
+  display:grid;
+  grid-template-columns:18cqw minmax(0,1fr) 23cqw;
+  align-items:start;
+  border-bottom:.09cqw solid #53a7ef;
+  overflow:hidden;
+}
+.poster-ball{
+  align-self:start;
+  justify-self:center;
+  margin-top:-2.4cqw;
+  font-size:13.8cqw;
+  line-height:1;
+  filter:drop-shadow(0 0 .45cqw #fff) drop-shadow(0 0 1.3cqw #ff6a00) drop-shadow(0 0 2cqw #e31d00);
+  transform:rotate(-13deg);
+}
+.poster-event{
+  position:relative;
+  height:9.2cqw;
+  display:grid;
+  align-content:start;
+  justify-items:center;
+  text-align:center;
+  line-height:1;
+  text-shadow:0 .24cqw .4cqw #000;
+}
+.poster-event small{font-size:2.15cqw;font-weight:950;color:#f8fbff;letter-spacing:.02em}
+.poster-event b{margin-top:.3cqw;font-size:3.05cqw;font-weight:950;color:#f5c740;text-shadow:0 .12cqw 0 #8a3c00,0 .35cqw .5cqw #000}
+.poster-event strong{
+  position:absolute;
+  right:-2cqw;
+  top:-1.25cqw;
+  color:#f5c21e;
+  font-size:9.5cqw;
+  line-height:1;
+  font-style:italic;
+  font-weight:1000;
+  transform:rotate(-7deg);
+  text-shadow:.18cqw .18cqw 0 #8b3500,0 0 1.2cqw #ff7a00;
+}
+.poster-royal{
+  padding-top:.1cqw;
+  display:grid;
+  grid-template-columns:5.2cqw 1fr;
+  grid-template-rows:1.45cqw 2.15cqw 1.5cqw;
+  align-items:center;
+  column-gap:.7cqw;
+  color:#fff;
+  text-align:center;
+  text-shadow:0 .15cqw .3cqw #000;
+}
+.poster-royal .tournament-crest{grid-row:1/4;width:5cqw;height:5.4cqw;filter:sepia(1) saturate(2.2) drop-shadow(0 0 .65cqw #f4c244)}
+.poster-royal span{font-size:.72cqw;font-weight:800}
+.poster-royal b{font-size:1.18cqw;color:#fff;border-top:.08cqw solid #388add;border-bottom:.08cqw solid #388add;padding:.22cqw 0}
+.poster-royal small{font-size:.65cqw;color:#d6e9ff}
+.poster-date{
+  position:absolute;
+  left:17cqw;
+  bottom:.35cqw;
+  width:28cqw;
+  height:2.55cqw;
+  display:grid;
+  place-items:center;
+  background:linear-gradient(90deg,transparent,#b90f22 8% 92%,transparent);
+  clip-path:polygon(4% 0,96% 0,100% 50%,96% 100%,4% 100%,0 50%);
+  filter:drop-shadow(0 0 .45cqw #ff263e);
+}
+.poster-date b{font-size:1.45cqw;font-weight:950}
+.poster-location{
+  position:absolute;
+  right:8cqw;
+  bottom:.62cqw;
+  color:#eef7ff;
+  font-size:1.15cqw;
+  font-weight:900;
+  text-shadow:0 .15cqw .3cqw #000;
+}
+.poster-location span{color:#f5d14c}
+
+.poster-table-head{
+  display:grid;
+  grid-template-columns:6.5cqw 10.5cqw 6.4cqw 13.5cqw 1fr;
+  align-items:center;
+  border:.1cqw solid #5ab8ff;
+  border-radius:.35cqw;
+  background:linear-gradient(180deg,#071323,#01050b);
+  box-shadow:0 0 .65cqw #188cf67a;
+  overflow:hidden;
+}
+.poster-table-head b{height:100%;display:grid;place-items:center;border-right:.07cqw solid #355f80;font-size:1.18cqw}
+.poster-table-head b:last-child{border-right:0}
+
+.poster-schedule{min-height:0;display:flex;flex-direction:column;gap:.2cqw}
+.promo-match{
+  flex:1 1 0;
+  min-height:0;
+  position:relative;
+  display:grid;
+  grid-template-columns:6.5cqw 10.5cqw 6.4cqw 13.5cqw minmax(0,1fr) 3.8cqw minmax(0,1fr);
+  align-items:center;
+  border:.08cqw solid #58aef2;
+  border-radius:.3cqw;
+  background:linear-gradient(90deg,#07101eef,#081b35ed 48%,#061125ef);
+  box-shadow:inset 0 0 .65cqw #126fbd33,0 .12cqw .3cqw #0009;
+  overflow:hidden;
+}
+.promo-match:before{content:"";position:absolute;inset:0 auto 0 0;width:.2cqw;background:#efb52d;box-shadow:0 0 .45cqw #ff8b00}
+.promo-match.senior{border-color:#d7ad3f;background:linear-gradient(90deg,#12131def,#28200fed 48%,#11131eef)}
+.promo-match>div{height:100%;display:grid;place-items:center;border-right:.06cqw solid #376383}
+.promo-number{font-size:1.85cqw;font-weight:1000;font-style:italic;text-shadow:0 .2cqw .24cqw #000}
+.promo-class b{color:#f6d54b;font-size:1.15cqw;white-space:nowrap}
+.promo-group{font-size:2.05cqw;font-weight:1000;font-style:italic;text-shadow:0 .15cqw .25cqw #000}
+.promo-group.group-a{background:linear-gradient(135deg,#71000d,#f21c32)}
+.promo-group.group-b{background:linear-gradient(135deg,#063a8f,#167ef3)}
+.promo-group.group-c{background:linear-gradient(135deg,#006034,#00ad68)}
+.promo-group.group-d{background:linear-gradient(135deg,#806000,#d9aa13)}
+.promo-group.group-a-c{background:linear-gradient(135deg,#7c071a,#114e9e)}
+.promo-group.group-b-d{background:linear-gradient(135deg,#075ba2,#9d7600)}
+.promo-group.group-other{background:linear-gradient(135deg,#323d51,#65738d)}
+.promo-time b{font-size:1.15cqw;white-space:nowrap}
+.promo-team{
+  min-width:0;
+  border-right:0!important;
+  display:grid!important;
+  align-items:center!important;
+  gap:.75cqw;
+  padding:0 .7cqw;
+}
+.promo-team.home{grid-template-columns:minmax(0,1fr) 3.8cqw;text-align:right}
+.promo-team.away{grid-template-columns:3.8cqw minmax(0,1fr);text-align:left}
+.promo-team i{
+  width:3.45cqw;
+  height:3.45cqw;
+  padding:.12cqw;
+  display:grid;
+  place-items:center;
+  border-radius:.42cqw;
+  background:#f8fbff;
+  color:#082956;
+  box-shadow:0 0 .6cqw #248ee676;
+  font-style:normal;
+  overflow:hidden;
+}
+.promo-team img{width:100%;height:100%;object-fit:contain;border-radius:.3cqw}
+.promo-team em{font-size:.75cqw;font-style:normal;font-weight:950}
+.promo-team strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:1.22cqw;line-height:1.05}
+.promo-vs{border:0!important}
+.promo-vs small{color:#ffd849;font-size:1.75cqw;font-weight:1000;font-style:italic;text-shadow:0 0 .55cqw #ff7b00,0 .13cqw .2cqw #000}
+.poster-break{
+  flex:0 0 2cqw;
+  display:grid;
+  grid-template-columns:1fr auto 1fr;
+  align-items:center;
+  gap:.8cqw;
+  background:linear-gradient(90deg,transparent,#c70b19 8% 92%,transparent);
+  overflow:hidden;
+}
+.poster-break span{height:.22cqw;background:repeating-linear-gradient(135deg,#ff2638 0 .65cqw,#5d0008 .65cqw 1.3cqw)}
+.poster-break b{font-size:1cqw;font-weight:950}
+.poster-break small{margin-left:.55cqw;color:#ffd5d8;font-size:.65cqw}
+.matchday-poster.dense .promo-number{font-size:1.45cqw}
+.matchday-poster.dense .promo-class b,.matchday-poster.dense .promo-time b{font-size:.92cqw}
+.matchday-poster.dense .promo-team strong{font-size:1cqw}
+.matchday-poster.dense .promo-team i{width:2.8cqw;height:2.8cqw}
+.matchday-poster.dense .promo-team.home{grid-template-columns:minmax(0,1fr) 3.1cqw}
+.matchday-poster.dense .promo-team.away{grid-template-columns:3.1cqw minmax(0,1fr)}
+
+.poster-footer{
+  display:grid;
+  grid-template-columns:27cqw minmax(0,1fr) 20cqw;
+  align-items:center;
+  gap:1.4cqw;
+  border-top:.08cqw solid #477fb7;
+  background:linear-gradient(180deg,#06102040,#020713c7);
+  position:relative;
+}
+.academy-brand{height:100%;display:grid;grid-template-columns:5.2cqw 1fr;align-items:center;gap:.7cqw;transform:skew(-7deg)}
+.academy-brand img{width:4.7cqw;height:4.7cqw;object-fit:contain;filter:drop-shadow(0 0 .5cqw #f0bc3e)}
+.academy-brand b{font-size:1.12cqw;font-style:italic;line-height:1.05}
+.academy-brand em{display:block;color:#f2c425;font-size:2cqw;font-style:italic;letter-spacing:-.04em}
+.poster-motto{display:grid;justify-items:center;text-align:center}
+.poster-motto b{font-size:1.02cqw}
+.poster-motto span{margin-top:.18cqw;color:#d9e9f8;font-size:.65cqw;letter-spacing:.17em}
+.poster-follow{display:grid;justify-items:end;text-align:right}
+.poster-follow b{color:#f6d34e;font-size:1.15cqw}
+.poster-follow span{color:#e1eef9;font-size:.72cqw}
+.poster-organizers{position:absolute;right:0;top:-4.7cqw;display:flex;gap:.35cqw}
+.poster-organizers span{width:2.25cqw;height:2.25cqw;padding:.12cqw;display:grid;place-items:center;border-radius:50%;background:#fff;box-shadow:0 0 .5cqw #4aa6ff}
+.poster-organizers img{width:100%;height:100%;object-fit:contain;border-radius:50%}
+
+@media(max-width:760px){
+  .infographic-page{padding:14px 8px}
+  .infographic-toolbar{display:grid}
+  .infographic-tools{justify-items:start}
+  .infographic-toolbar nav{justify-content:flex-start}
+  .infographic-downloads{flex-wrap:wrap}
+  .infographic-toolbar h1{font-size:1.45rem}
+  .infographic-toolbar p{font-size:.78rem}
+  .infographic-preview{width:100%}
+  .matchday-poster{box-shadow:0 10px 32px #000b}
+}

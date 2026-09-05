@@ -8,6 +8,7 @@ import PublicView from'../views/PublicView.vue'
 import TeamDirectoryView from'../views/TeamDirectoryView.vue'
 import TeamDetailView from'../views/TeamDetailView.vue'
 import ResultsView from'../views/ResultsView.vue'
+import InfographicView from'../views/InfographicView.vue'
 
 export default createRouter({history:createWebHistory(),routes:[
   {path:'/',redirect:'/matches'},
@@ -17,6 +18,7 @@ export default createRouter({history:createWebHistory(),routes:[
   {path:'/standings',component:StandingsView},
   {path:'/rounds',component:BracketView},
   {path:'/results',component:ResultsView},
+  {path:'/infographic',component:InfographicView},
   {path:'/admin/results',component:MatchesView},
   {path:'/draw/admin',component:DrawAdminView},
   {path:'/live/draw',component:LiveDrawView},

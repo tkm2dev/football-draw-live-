@@ -9,6 +9,7 @@ const s=useTournamentStore()
 const route=useRoute()
 const router=useRouter()
 const selectedDate=ref(typeof route.query.date==='string'?route.query.date:'2026-09-06')
+const exportMode=computed(()=>route.query.export==='1')
 const timeZone='Asia/Bangkok'
 const organizerLogos=[
   {name:'เทศบาลตำบลปลาปาก',logo:'/assets/organizers/pla-pak-municipality.png'},
@@ -38,7 +39,7 @@ onMounted(async()=>{
 </script>
 
 <template>
-  <div class="infographic-page">
+  <div :class="['infographic-page',{exporting:exportMode}]">
     <header class="infographic-toolbar">
       <div><RouterLink to="/matches">← กลับหน้าตารางแข่งขัน</RouterLink><h1>ภาพประชาสัมพันธ์รายวัน</h1><p>เลือกวันที่เพื่อดูโปรแกรมในรูปแบบโปสเตอร์</p></div>
       <nav aria-label="เลือกวันแข่งขัน"><button v-for="date in dates" :key="date" :class="{active:selectedDate===date}" type="button" @click="selectedDate=date">{{shortDate(date)}}</button></nav>

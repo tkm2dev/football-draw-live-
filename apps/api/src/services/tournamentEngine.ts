@@ -1,6 +1,7 @@
 import {DrawStatus,MatchStage,MatchStatus,Prisma,type DivisionType,type GroupCode as DbGroupCode} from '@prisma/client'
 import {prisma} from '../db.js'
 import {GROUP_CODES,type DivisionKey,type GroupCode} from './drawEngine.js'
+import {planKnockoutAdvance} from './knockout.js'
 import type {ApiTeam,AuditContext} from './drawService.js'
 
 export type Match={id:string;sequenceNo?:number;divisionKey:DivisionKey;stage:'GROUP'|'QF'|'SF'|'FINAL';group?:GroupCode;round:number;home:ApiTeam;away:ApiTeam;homeScore:number|null;awayScore:number|null;status:'SCHEDULED'|'LIVE'|'FINISHED';kickoffAt:string|null;field:string}
@@ -184,35 +185,21 @@ export async function generateKnockout(key:DivisionKey,context:AuditContext={}):
   },{isolationLevel:Prisma.TransactionIsolationLevel.Serializable})
 }
 
-const winner=(match:MatchRow)=>match.homeScore!>match.awayScore!?match.homeTeamId:match.awayTeamId
 export async function advanceKnockout(key:DivisionKey,context:AuditContext={}):Promise<Match[]>{
   return prisma.$transaction(async tx=>{
     const div=await division(tx,key)
     await tx.$queryRaw`SELECT id FROM Division WHERE id = ${div.id} FOR UPDATE`
     const rows=await matchRows(tx,div.id)
-    const qf=rows.filter(match=>match.stage===MatchStage.QF).sort((a,b)=>a.round-b.round)
-    if(qf.length!==4||qf.some(match=>match.status!==MatchStatus.FINISHED||match.homeScore===match.awayScore))throw new Error('กรุณากรอกผลรอบ 8 ทีมให้ครบและต้องมีผู้ชนะ')
-    if(!rows.some(match=>match.stage===MatchStage.SF)){
-      const sfPairs=[[winner(qf[0]),winner(qf[2])],[winner(qf[1]),winner(qf[3])]] as const
-      const scheduleNos=key==='PUBLIC'?[33,34]:[35,36]
+    const plan=planKnockoutAdvance(rows.map(row=>({stage:row.stage,round:row.round,homeTeamId:row.homeTeamId,awayTeamId:row.awayTeamId,homeScore:row.homeScore,awayScore:row.awayScore,status:row.status})))
+    if(plan.stage){
+      const scheduleNos=plan.stage==='SF'?(key==='PUBLIC'?[33,34]:[35,36]):(key==='PUBLIC'?[37]:[39])
       const slots=await tx.scheduleEntry.findMany({where:{tournamentId:div.tournamentId,sequenceNo:{in:scheduleNos}}})
-      for(const [index,pair] of sfPairs.entries()){
+      for(const [index,pair] of plan.pairs.entries()){
         const slot=slots.find(item=>item.sequenceNo===scheduleNos[index]),home=div.teams.find(team=>team.id===pair[0])!,away=div.teams.find(team=>team.id===pair[1])!
-        const created=await tx.match.create({data:{divisionId:div.id,stage:MatchStage.SF,round:index+1,homeTeamId:home.id,awayTeamId:away.id,kickoffAt:slot?.startsAt,field:slot?.field??'สนามกลาง'}})
+        const created=await tx.match.create({data:{divisionId:div.id,stage:plan.stage as MatchStage,round:index+1,homeTeamId:home.id,awayTeamId:away.id,kickoffAt:slot?.startsAt,field:slot?.field??'สนามกลาง'}})
         if(slot)await tx.scheduleEntry.update({where:{id:slot.id},data:{matchId:created.id,homeLabel:home.name,awayLabel:away.name,homeScore:null,awayScore:null,status:MatchStatus.SCHEDULED}})
       }
-      await audit(tx,div.id,'MATCH_SCHEDULE',String(div.id),'ADVANCE_KNOCKOUT',context,{stage:'SF'})
-    }else{
-      const sf=rows.filter(match=>match.stage===MatchStage.SF).sort((a,b)=>a.round-b.round)
-      if(sf.length!==2||sf.some(match=>match.status!==MatchStatus.FINISHED||match.homeScore===match.awayScore))throw new Error('กรุณากรอกผลรอบรองชนะเลิศให้ครบและต้องมีผู้ชนะ')
-      if(!rows.some(match=>match.stage===MatchStage.FINAL)){
-        const scheduleNo=key==='PUBLIC'?37:39
-        const slot=await tx.scheduleEntry.findFirst({where:{tournamentId:div.tournamentId,sequenceNo:scheduleNo}})
-        const home=div.teams.find(team=>team.id===winner(sf[0]))!,away=div.teams.find(team=>team.id===winner(sf[1]))!
-        const created=await tx.match.create({data:{divisionId:div.id,stage:MatchStage.FINAL,round:1,homeTeamId:home.id,awayTeamId:away.id,kickoffAt:slot?.startsAt,field:slot?.field??'สนามกลาง'}})
-        if(slot)await tx.scheduleEntry.update({where:{id:slot.id},data:{matchId:created.id,homeLabel:home.name,awayLabel:away.name,homeScore:null,awayScore:null,status:MatchStatus.SCHEDULED}})
-        await audit(tx,div.id,'MATCH_SCHEDULE',String(div.id),'ADVANCE_KNOCKOUT',context,{stage:'FINAL'})
-      }
+      await audit(tx,div.id,'MATCH_SCHEDULE',String(div.id),'ADVANCE_KNOCKOUT',context,{stage:plan.stage})
     }
     return(await matchRows(tx,div.id)).map(row=>matchView(key,row))
   },{isolationLevel:Prisma.TransactionIsolationLevel.Serializable})

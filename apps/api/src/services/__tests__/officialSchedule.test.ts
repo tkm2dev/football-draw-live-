@@ -18,6 +18,15 @@ describe('official 2569 competition schedule',()=>{
     ])
   })
 
+  it('schedules the eight quarter-finals on 19 Sept with three morning public ties before lunch',()=>{
+    const qf=OFFICIAL_SCHEDULE.filter(item=>item.stage==='QF')
+    expect(qf.map(item=>[item.sequenceNo,item.startsAt.slice(11,16),item.endsAt.slice(11,16)])).toEqual([
+      [25,'10:00','10:40'],[26,'10:40','11:20'],[27,'11:20','12:00'],[28,'13:00','13:50'],
+      [29,'13:50','14:40'],[30,'14:40','15:30'],[31,'15:30','16:20'],[32,'16:20','17:10'],
+    ])
+    expect(qf.every(item=>item.startsAt.slice(0,10)==='2026-09-19')).toBe(true)
+  })
+
   it('preserves the special VIP fixture and final match times',()=>{
     const special=OFFICIAL_SCHEDULE.find(item=>item.sequenceNo===38)!
     expect(special.categoryLabel).toBe('คู่พิเศษ')

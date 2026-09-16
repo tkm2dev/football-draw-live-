@@ -35,7 +35,21 @@ const localInput=(iso:string|null|undefined)=>{
   return local.toISOString().slice(0,16)
 }
 function syncDrafts(){drafts.value=[...s.groupMatches].sort((a,b)=>(a.sequenceNo??999)-(b.sequenceNo??999)||a.round-b.round||(a.group??'').localeCompare(b.group??'')).map((match,index)=>({id:match.id,sequenceNo:match.sequenceNo??index+1,group:match.group!,round:match.round,homeTeamCode:match.home.id,awayTeamCode:match.away.id,kickoffLocal:localInput(match.kickoffAt),field:match.field||'',homeScore:match.homeScore,awayScore:match.awayScore,status:match.status}))}
-watch(()=>s.matches,syncDrafts,{deep:true})
+
+interface KnockoutDraft{id:string;sequenceNo:number;stage:'QF'|'SF'|'FINAL';round:number;home:Team;away:Team;kickoffAt:string|null|undefined;homeScore:number|null;awayScore:number|null;status:Match['status']}
+const knockoutDrafts=ref<KnockoutDraft[]>([])
+function syncKnockoutDrafts(){knockoutDrafts.value=[...s.knockoutMatches].sort((a,b)=>(a.sequenceNo??999)-(b.sequenceNo??999)||a.round-b.round).map(match=>({id:match.id,sequenceNo:match.sequenceNo??0,stage:match.stage as KnockoutDraft['stage'],round:match.round,home:match.home,away:match.away,kickoffAt:match.kickoffAt,homeScore:match.homeScore,awayScore:match.awayScore,status:match.status}))}
+function syncAllDrafts(){syncDrafts();syncKnockoutDrafts()}
+watch(()=>s.matches,syncAllDrafts,{deep:true})
+
+const knockoutStageTitle=(stage:KnockoutDraft['stage'])=>stage==='QF'?'รอบ 8 ทีม':stage==='SF'?'รอบรองชนะเลิศ':'รอบชิงชนะเลิศ'
+const knockoutTime=(iso:string|null|undefined)=>iso?new Date(iso).toLocaleString('th-TH',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Bangkok'}):'—'
+const decidedRound=(matches:Match[],expected:number)=>matches.length===expected&&matches.every(match=>match.status==='FINISHED'&&match.homeScore!==null&&match.awayScore!==null&&match.homeScore!==match.awayScore)
+const qfMatches=computed(()=>s.knockoutMatches.filter(match=>match.stage==='QF'))
+const sfMatches=computed(()=>s.knockoutMatches.filter(match=>match.stage==='SF'))
+const finalMatches=computed(()=>s.knockoutMatches.filter(match=>match.stage==='FINAL'))
+const advanceReady=computed(()=>sfMatches.value.length===0?decidedRound(qfMatches.value,4):finalMatches.value.length===0?decidedRound(sfMatches.value,2):false)
+const advanceLabel=computed(()=>!qfMatches.value.length?'ยังไม่มีรอบน็อกเอาต์':sfMatches.value.length===0?'สร้างคู่รอบรองชนะเลิศ':finalMatches.value.length===0?'สร้างคู่รอบชิงชนะเลิศ':'สร้างครบทุกรอบแล้ว')
 const teamsInGroup=(group:GroupCode)=>s.groups[group]
 const team=(code:string):Team|undefined=>s.teams.find(item=>item.id===code)
 const initials=(name:string)=>name.trim().split(/\s+/).slice(0,2).map(part=>part[0]).join('').toUpperCase()
@@ -44,11 +58,11 @@ const score=(value:unknown)=>value===''||value===null||value===undefined?null:Nu
 async function run(action:()=>Promise<void>,success:string){busy.value=true;message.value='';try{await action();message.value=success;messageType.value='ok'}catch(error){message.value=error instanceof Error?error.message:'เกิดข้อผิดพลาด';messageType.value='error'}finally{busy.value=false}}
 async function selectDivision(key:DivisionKey){
   if(busy.value||key===s.divisionKey)return
-  await run(async()=>{await s.setDivision(key);syncDrafts()},`เปลี่ยนเป็น${key==='PUBLIC'?'รุ่นประชาชน':'รุ่นอาวุโส 40+'}แล้ว`)
+  await run(async()=>{await s.setDivision(key);syncAllDrafts()},`เปลี่ยนเป็น${key==='PUBLIC'?'รุ่นประชาชน':'รุ่นอาวุโส 40+'}แล้ว`)
 }
 async function installOfficial(){
   if(s.scheduleEntries.length&&!window.confirm('ติดตั้งตารางทางการใหม่? โปรแกรมเดิมที่ยังไม่เริ่มแข่งจะถูกแทนที่'))return
-  await run(async()=>{await s.installOfficialSchedule();syncDrafts()},'ติดตั้งตารางทางการครบ 39 คู่ และผูกรอบแบ่งกลุ่ม 24 คู่แล้ว')
+  await run(async()=>{await s.installOfficialSchedule();syncAllDrafts()},'ติดตั้งตารางทางการครบ 39 คู่ และผูกรอบแบ่งกลุ่ม 24 คู่แล้ว')
 }
 const dateTitle=(date:string)=>new Date(`${date}T12:00:00+07:00`).toLocaleDateString('th-TH',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'Asia/Bangkok'})
 const timeOnly=(value:string)=>new Date(value).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Bangkok'})
@@ -75,6 +89,20 @@ async function saveResult(draft:MatchDraft){
     await s.saveMatchResult(draft.id,home,away,draft.status)
     syncDrafts();message.value=`บันทึกผลสาย ${draft.group} นัดที่ ${draft.round} แล้ว`;messageType.value='ok'
   }catch(error){message.value=error instanceof Error?error.message:'บันทึกผลไม่สำเร็จ';messageType.value='error'}finally{busyMatch.value=''}
+}
+async function saveKnockoutResult(draft:KnockoutDraft){
+  busyMatch.value=draft.id;message.value=''
+  try{
+    const home=score(draft.homeScore),away=score(draft.awayScore)
+    if(draft.status==='FINISHED'&&(home===null||away===null))throw new Error('กรุณากรอกสกอร์ทั้งสองทีมก่อนยืนยันว่าจบการแข่งขัน')
+    if(draft.status==='FINISHED'&&home!==null&&away!==null&&home===away)throw new Error('รอบน็อกเอาต์ต้องมีผู้ชนะ ไม่สามารถเสมอได้')
+    await s.saveMatchResult(draft.id,home,away,draft.status)
+    syncAllDrafts();message.value=`บันทึกผล${knockoutStageTitle(draft.stage)} คู่ที่ ${draft.sequenceNo} แล้ว`;messageType.value='ok'
+  }catch(error){message.value=error instanceof Error?error.message:'บันทึกผลไม่สำเร็จ';messageType.value='error'}finally{busyMatch.value=''}
+}
+async function advanceRound(){
+  if(!advanceReady.value)return
+  await run(async()=>{await s.advanceKnockout();syncAllDrafts()},'สร้างคู่รอบถัดไปจากผู้ชนะเรียบร้อยแล้ว')
 }
 async function uploadLogoFile(code:string,file:File,input?:HTMLInputElement){
   if(!file)return
@@ -113,7 +141,7 @@ async function pasteLogo(event:ClipboardEvent){
   await uploadLogoFile(pasteTargetCode.value,file)
 }
 
-onMounted(async()=>{window.addEventListener('paste',pasteLogo);s.connect();await Promise.all([s.loadState(),s.loadTournament(),s.loadOfficialSchedule()]);syncDrafts()})
+onMounted(async()=>{window.addEventListener('paste',pasteLogo);s.connect();await Promise.all([s.loadState(),s.loadTournament(),s.loadOfficialSchedule()]);syncAllDrafts()})
 onBeforeUnmount(()=>window.removeEventListener('paste',pasteLogo))
 </script>
 
@@ -163,6 +191,22 @@ onBeforeUnmount(()=>window.removeEventListener('paste',pasteLogo))
       <section v-else class="match-table-card">
         <header><div><div class="eyebrow">OFFICIAL FIXTURES & RESULTS</div><h2>ตารางแข่งขันและบันทึกผล</h2></div><button class="btn gold" :disabled="busy" @click="saveSchedule">{{busy?'กำลังบันทึก...':'บันทึกโปรแกรมทั้งหมด'}}</button></header>
         <div class="match-table-scroll"><table class="match-operations-table"><thead><tr><th>คู่ที่</th><th>วันและเวลา</th><th>สาย/รอบ</th><th>ทีมเหย้า</th><th>ผล</th><th>ทีมเยือน</th><th>สนาม</th><th>สถานะ</th><th></th></tr></thead><tbody><tr v-for="draft in drafts" :key="draft.id" :class="draft.status.toLowerCase()"><td><b>{{draft.sequenceNo}}</b></td><td><input v-model="draft.kickoffLocal" type="datetime-local"></td><td><span class="match-group-chip">{{draft.group}}</span><small>รอบ {{draft.round}}</small></td><td><div class="match-team-select"><span><img v-if="team(draft.homeTeamCode)?.logoUrl" :src="team(draft.homeTeamCode)?.logoUrl" alt=""><b v-else>{{initials(team(draft.homeTeamCode)?.name||'?')}}</b></span><select v-model="draft.homeTeamCode"><option v-for="option in teamsInGroup(draft.group)" :key="option.id" :value="option.id" :disabled="option.id===draft.awayTeamCode">{{option.name}}</option></select></div></td><td><div class="score-inputs"><input v-model.number="draft.homeScore" type="number" min="0"><b>–</b><input v-model.number="draft.awayScore" type="number" min="0"></div></td><td><div class="match-team-select"><span><img v-if="team(draft.awayTeamCode)?.logoUrl" :src="team(draft.awayTeamCode)?.logoUrl" alt=""><b v-else>{{initials(team(draft.awayTeamCode)?.name||'?')}}</b></span><select v-model="draft.awayTeamCode"><option v-for="option in teamsInGroup(draft.group)" :key="option.id" :value="option.id" :disabled="option.id===draft.homeTeamCode">{{option.name}}</option></select></div></td><td><input v-model.trim="draft.field" maxlength="120" placeholder="สนาม"></td><td><select v-model="draft.status"><option value="SCHEDULED">รอแข่ง</option><option value="LIVE">กำลังแข่ง</option><option value="FINISHED">จบแล้ว</option></select></td><td><button class="mini save-result" :disabled="Boolean(busyMatch)" @click="saveResult(draft)">{{busyMatch===draft.id?'…':'บันทึกผล'}}</button></td></tr></tbody></table></div>
+      </section>
+
+      <section v-if="knockoutDrafts.length" class="knockout-results-card">
+        <header><div><div class="eyebrow">KNOCKOUT RESULTS</div><h2>บันทึกผลรอบน็อกเอาต์และสร้างรอบถัดไป</h2><p>กรอกสกอร์รอบ 8 ทีม → รอบรองชนะเลิศ → รอบชิงชนะเลิศ (ทุกคู่ต้องมีผู้ชนะ) แล้วกดปุ่มเพื่อให้ระบบสร้างคู่รอบถัดไปจากผู้ชนะโดยอัตโนมัติ ไม่กระทบคู่หรือผลเดิม</p></div><button class="btn gold" :disabled="busy||!advanceReady" @click="advanceRound">{{busy?'กำลังสร้าง...':advanceLabel}}</button></header>
+        <div class="knockout-table-scroll"><table class="knockout-operations-table"><thead><tr><th>คู่ที่</th><th>รอบ</th><th>วันและเวลา</th><th>ทีมเหย้า</th><th>ผล</th><th>ทีมเยือน</th><th>สถานะ</th><th></th></tr></thead><tbody>
+          <tr v-for="draft in knockoutDrafts" :key="draft.id" :class="draft.status.toLowerCase()">
+            <td><b>{{draft.sequenceNo}}</b></td>
+            <td><span class="knockout-stage-chip">{{knockoutStageTitle(draft.stage)}}</span></td>
+            <td><time>{{knockoutTime(draft.kickoffAt)}}</time></td>
+            <td><div class="knockout-team"><span><img v-if="draft.home.logoUrl" :src="draft.home.logoUrl" :alt="`โลโก้ ${draft.home.name}`"><b v-else>{{initials(draft.home.name)}}</b></span><strong>{{draft.home.name}}</strong></div></td>
+            <td><div class="score-inputs"><input v-model.number="draft.homeScore" type="number" min="0" inputmode="numeric"><b>–</b><input v-model.number="draft.awayScore" type="number" min="0" inputmode="numeric"></div></td>
+            <td><div class="knockout-team"><span><img v-if="draft.away.logoUrl" :src="draft.away.logoUrl" :alt="`โลโก้ ${draft.away.name}`"><b v-else>{{initials(draft.away.name)}}</b></span><strong>{{draft.away.name}}</strong></div></td>
+            <td><select v-model="draft.status"><option value="SCHEDULED">รอแข่ง</option><option value="LIVE">กำลังแข่ง</option><option value="FINISHED">จบแล้ว</option></select></td>
+            <td><button class="mini save-result" :disabled="Boolean(busyMatch)" @click="saveKnockoutResult(draft)">{{busyMatch===draft.id?'…':'บันทึกผล'}}</button></td>
+          </tr>
+        </tbody></table></div>
       </section>
 
       <section v-if="drafts.length" class="match-standings-preview"><header><div><div class="eyebrow">LIVE GROUP TABLES</div><h2>ตารางคะแนนล่าสุด</h2></div><RouterLink class="btn" to="/standings">เปิดหน้าตารางคะแนนเต็ม</RouterLink></header><div class="standings-grid"><article v-for="group in groupCodes" :key="group" class="table-card compact-table"><h3>สาย {{group}}</h3><table><thead><tr><th>#</th><th>ทีม</th><th>แข่ง</th><th>ได้/เสีย</th><th>+/-</th><th>แต้ม</th></tr></thead><tbody><tr v-for="row in s.standings[group]" :key="row.team.id" :class="{qualify:row.rank<=2}"><td>{{row.rank}}</td><td><span class="standing-team"><img v-if="row.team.logoUrl" :src="row.team.logoUrl" alt=""><b>{{row.team.name}}</b></span></td><td>{{row.p}}</td><td>{{row.gf}}/{{row.ga}}</td><td>{{row.gd}}</td><td><strong>{{row.pts}}</strong></td></tr></tbody></table></article></div></section>

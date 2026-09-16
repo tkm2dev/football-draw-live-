@@ -117,4 +117,30 @@ integration('Prisma/MySQL draw and match persistence',()=>{
     await updateMatch('PUBLIC',first.matchId!,{homeScore:1,awayScore:0,status:'FINISHED'},{actor:'integration-test'})
     expect((await listOfficialSchedule())[0]).toMatchObject({homeScore:1,awayScore:0,status:'FINISHED'})
   })
+
+  it('advances the knockout bracket from quarter-finals to the final and links each schedule slot',async()=>{
+    const {advanceKnockout,generateKnockout,listMatches,updateMatch}=await import('../tournamentEngine.js')
+    const {listOfficialSchedule}=await import('../officialSchedule.js')
+    const linked=(schedule:Awaited<ReturnType<typeof listOfficialSchedule>>,sequenceNos:number[])=>schedule.filter(entry=>sequenceNos.includes(entry.sequenceNo)&&entry.matchId).length
+    // Finish every public group match so the quarter-finals can be generated from the standings.
+    for(const match of (await listMatches('PUBLIC')).filter(item=>item.stage==='GROUP'))
+      await updateMatch('PUBLIC',match.id,{homeScore:1,awayScore:0,status:'FINISHED'},{actor:'integration-test'})
+    const quarterFinals=(await generateKnockout('PUBLIC',{actor:'integration-test'})).filter(match=>match.stage==='QF')
+    expect(quarterFinals).toHaveLength(4)
+    expect(linked(await listOfficialSchedule(),[25,26,27,28])).toBe(4)
+    // A winner in every quarter-final unlocks the semi-finals (schedule slots 33 and 34).
+    await expect(advanceKnockout('PUBLIC',{actor:'integration-test'})).rejects.toThrow(/รอบ 8 ทีม/)
+    for(const match of (await listMatches('PUBLIC')).filter(item=>item.stage==='QF'))
+      await updateMatch('PUBLIC',match.id,{homeScore:2,awayScore:1,status:'FINISHED'},{actor:'integration-test'})
+    expect((await advanceKnockout('PUBLIC',{actor:'integration-test'})).filter(match=>match.stage==='SF')).toHaveLength(2)
+    expect(linked(await listOfficialSchedule(),[33,34])).toBe(2)
+    // The final (slot 37) only appears once both semi-finals have a winner.
+    await expect(advanceKnockout('PUBLIC',{actor:'integration-test'})).rejects.toThrow(/รอบรองชนะเลิศ/)
+    for(const match of (await listMatches('PUBLIC')).filter(item=>item.stage==='SF'))
+      await updateMatch('PUBLIC',match.id,{homeScore:3,awayScore:1,status:'FINISHED'},{actor:'integration-test'})
+    expect((await advanceKnockout('PUBLIC',{actor:'integration-test'})).filter(match=>match.stage==='FINAL')).toHaveLength(1)
+    expect((await listOfficialSchedule()).find(entry=>entry.sequenceNo===37)?.matchId).toBeTruthy()
+    // Advancing again is a safe no-op once the final exists — existing rounds are never rebuilt.
+    expect((await advanceKnockout('PUBLIC',{actor:'integration-test'})).filter(match=>match.stage==='FINAL')).toHaveLength(1)
+  })
 })
